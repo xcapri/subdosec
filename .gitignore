@@ -1,2 +1,4 @@
 .env
 test.txt
+.gitignore
+gassmeteor
