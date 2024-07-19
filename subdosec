@@ -17,7 +17,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 def init_key(apikey):
     """Initialize the API key in the .env file."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    env_file = os.path.join(script_dir, 'config/.env')
+    env_file = os.path.join(script_dir, 'subdosec_/config/.env')
     
     # Load the .env file
     load_dotenv(dotenv_path=env_file)
@@ -28,7 +28,7 @@ def init_key(apikey):
 def load_env_vars(mode):
     """Load environment variables and ensure required ones are present."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    env_file = os.path.join(script_dir, 'config/.env')
+    env_file = os.path.join(script_dir, 'subdosec_/config/.env')
 
     # Load the .env file
     load_dotenv(dotenv_path=env_file)
