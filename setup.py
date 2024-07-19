@@ -17,7 +17,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'subdosec=subdosec.main:main',
+            'subdosec=core.main:main',
         ],
     },
 )
