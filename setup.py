@@ -10,7 +10,6 @@ setup(
     version='0.2',
     package_data={"subdosec_": ["config/*.env"]},
     packages=find_packages(),
-    include_package_data=True,
     install_requires=[
         'requests',
         'python-dotenv',
