@@ -1,4 +1,7 @@
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, os
+
+config = "config{sep}*.*".format(sep=os.sep)
+
 
 setup(
     name='Subdosec',
