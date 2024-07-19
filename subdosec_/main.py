@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-
 import sys
 import os
 import json
@@ -16,17 +14,22 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def init_key(apikey):
     """Initialize the API key in the .env file."""
-    load_dotenv()
     script_dir = os.path.dirname(os.path.abspath(__file__))
-
-    env_file = os.path.join(script_dir, 'config/.env')  
+    env_file = os.path.join(script_dir, 'config/.env')
+    
+    # Load the .env file
+    load_dotenv(dotenv_path=env_file)
     set_key(env_file, 'APIKEY', apikey)
         
     print(f"API key has been written to {env_file}")
 
 def load_env_vars(mode):
     """Load environment variables and ensure required ones are present."""
-    load_dotenv()
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    env_file = os.path.join(script_dir, 'config/.env')
+
+    # Load the .env file
+    load_dotenv(dotenv_path=env_file)
 
     apikey = os.getenv('APIKEY') if mode == 'private' else os.getenv('PUBLIC_API_KEY')
     output_scan = os.getenv('OUTPUT_SCAN_PRIV') if mode == 'private' else os.getenv('OUTPUT_SCAN_PUB')
@@ -39,7 +42,7 @@ def load_env_vars(mode):
     # Specific check for private mode
     if mode == 'private' and not apikey:
         raise ValueError(f"Create a password & apikey first at here {os.getenv('SIGNUP_URL')}.\nThen run python subdosec.py -initkey your-key")
-    if mode == 'public' : 
+    if mode == 'public': 
         print(f"[WARNING] You don't use private mode, the result will be public.")
     return apikey, output_scan, host_scan
 
@@ -116,8 +119,7 @@ def scan_by_web(mode):
     except ValueError as e:
         print(f"[Configuration Error] {e}")
 
-def main():
-    """Entry point for the script."""
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Web scanner.')
     parser.add_argument('-mode', choices=['private', 'public'], default='public', help='Mode of operation (private/public)')
     parser.add_argument('-initkey', help='Initialize the API key')
@@ -128,6 +130,3 @@ def main():
         init_key(args.initkey)
     else:
         scan_by_web(args.mode)
-
-if __name__ == "__main__":
-    main()
