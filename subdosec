@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import sys
 import os
 import json
@@ -15,7 +17,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 def init_key(apikey):
     """Initialize the API key in the .env file."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    env_file = os.path.join(script_dir, 'subdosec_/config/.env')
+    env_file = os.path.join(script_dir, 'config/.env')
     
     # Load the .env file
     load_dotenv(dotenv_path=env_file)
@@ -26,7 +28,7 @@ def init_key(apikey):
 def load_env_vars(mode):
     """Load environment variables and ensure required ones are present."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    env_file = os.path.join(script_dir, 'subdosec_/config/.env')
+    env_file = os.path.join(script_dir, 'config/.env')
 
     # Load the .env file
     load_dotenv(dotenv_path=env_file)
@@ -119,7 +121,8 @@ def scan_by_web(mode):
     except ValueError as e:
         print(f"[Configuration Error] {e}")
 
-if __name__ == "__main__":
+def main():
+    """Entry point for the script."""
     parser = argparse.ArgumentParser(description='Web scanner.')
     parser.add_argument('-mode', choices=['private', 'public'], default='public', help='Mode of operation (private/public)')
     parser.add_argument('-initkey', help='Initialize the API key')
@@ -130,3 +133,6 @@ if __name__ == "__main__":
         init_key(args.initkey)
     else:
         scan_by_web(args.mode)
+
+if __name__ == "__main__":
+    main()

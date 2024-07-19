@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import sys
 import os
 import json
@@ -119,7 +121,8 @@ def scan_by_web(mode):
     except ValueError as e:
         print(f"[Configuration Error] {e}")
 
-if __name__ == "__main__":
+def main():
+    """Entry point for the script."""
     parser = argparse.ArgumentParser(description='Web scanner.')
     parser.add_argument('-mode', choices=['private', 'public'], default='public', help='Mode of operation (private/public)')
     parser.add_argument('-initkey', help='Initialize the API key')
@@ -130,3 +133,6 @@ if __name__ == "__main__":
         init_key(args.initkey)
     else:
         scan_by_web(args.mode)
+
+if __name__ == "__main__":
+    main()
