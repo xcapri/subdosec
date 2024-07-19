@@ -1,7 +1,5 @@
 from setuptools import setup, find_packages, os
 
-config = "config{sep}*.*".format(sep=os.sep)
-
 
 setup(
     name='Subdosec',
@@ -10,7 +8,7 @@ setup(
     author_email='N/A',
     url='https://github.com/xcapri/subdosec',
     version='0.2',
-    package_data={'subdosec_': [config]},
+    package_data={"subdosec_": ["config/*.env"]},
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
