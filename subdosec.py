@@ -2,20 +2,28 @@ import sys
 import os
 import json
 import base64
+import argparse
 import requests
 from requests.exceptions import RequestException, HTTPError, ConnectionError
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 from bs4 import BeautifulSoup
 import urllib3
 
 # Disable SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-def load_env_vars():
+def init_key(apikey):
+    """Initialize the API key in the .env file."""
+    load_dotenv()
+    env_file = os.path.join(os.getcwd(), '.env')  
+    set_key(env_file, 'APIKEY', apikey)
+        
+    print(f"API key has been written to {env_file}")
+
+def load_env_vars(mode):
     """Load environment variables and ensure required ones are present."""
     load_dotenv()
 
-    mode = os.getenv('MODE', 'public')
     apikey = os.getenv('APIKEY') if mode == 'private' else os.getenv('PUBLIC_API_KEY')
     output_scan = os.getenv('OUTPUT_SCAN_PRIV') if mode == 'private' else os.getenv('OUTPUT_SCAN_PUB')
     host_scan = os.getenv('SCAN_API_HOST')
@@ -26,9 +34,10 @@ def load_env_vars():
 
     # Specific check for private mode
     if mode == 'private' and not apikey:
-        raise ValueError(f"Create a password & apikey first at here {os.getenv('SIGNUP_URL')}.")
-
-    return mode, apikey, output_scan, host_scan
+        raise ValueError(f"Create a password & apikey first at here {os.getenv('SIGNUP_URL')}.\nThen run python subdosec.py -initkey your-key")
+    if mode == 'public' : 
+        print(f"[WARNING] You don't use private mode, the result will be public.")
+    return apikey, output_scan, host_scan
 
 def fetch_fingerprints(host_scan):
     """Fetch and return fingerprints from the host_scan endpoint."""
@@ -90,10 +99,10 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints):
     except Exception as e:
         print(f"[Error] {target} : {e}")
 
-def scan_by_web():
+def scan_by_web(mode):
     """Main function to perform the web scanning."""
     try:
-        mode, apikey, output_scan, host_scan = load_env_vars()
+        apikey, output_scan, host_scan = load_env_vars(mode)
         fingerprints = fetch_fingerprints(host_scan)
         targets = [line.strip() for line in sys.stdin]
 
@@ -104,4 +113,13 @@ def scan_by_web():
         print(f"[Configuration Error] {e}")
 
 if __name__ == "__main__":
-    scan_by_web()
+    parser = argparse.ArgumentParser(description='Web scanner.')
+    parser.add_argument('-mode', choices=['private', 'public'], default='public', help='Mode of operation (private/public)')
+    parser.add_argument('-initkey', help='Initialize the API key')
+    
+    args = parser.parse_args()
+
+    if args.initkey:
+        init_key(args.initkey)
+    else:
+        scan_by_web(args.mode)
