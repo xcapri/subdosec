@@ -6,7 +6,7 @@ setup(
     author='xcapri',
     author_email='N/A',
     url='https://github.com/xcapri/subdosec',
-    version='0.3',
+    version='0.4',
     package_data={"subdosec_": ["config/*"]},
     include_package_data=True,
     packages=find_packages(),
@@ -14,7 +14,8 @@ setup(
         'requests',
         'python-dotenv',
         'beautifulsoup4',
-        'urllib3'
+        'urllib3',
+        'httpx'
     ],
     entry_points={
         'console_scripts': [

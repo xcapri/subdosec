@@ -10,12 +10,14 @@ from requests.exceptions import RequestException, HTTPError, ConnectionError
 from dotenv import load_dotenv, set_key
 from bs4 import BeautifulSoup
 import urllib3
+import httpx
+import asyncio
 
 # Disable SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+
 def init_key(apikey):
-    """Initialize the API key in the .env file."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     env_file = os.path.join(script_dir, 'subdosec_/config/.env')
     
@@ -26,7 +28,6 @@ def init_key(apikey):
     print(f"API key has been written to {env_file}")
 
 def load_env_vars(mode):
-    """Load environment variables and ensure required ones are present."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     env_file = os.path.join(script_dir, 'subdosec_/config/.env')
 
@@ -43,22 +44,32 @@ def load_env_vars(mode):
 
     # Specific check for private mode
     if mode == 'private' and not apikey:
-        raise ValueError(f"Create a password & apikey first at here {os.getenv('SIGNUP_URL')}.\nThen run python subdosec.py -initkey your-key")
+        raise ValueError(f"Create a password & apikey first at here {os.getenv('SIGNUP_URL')}.\nThen run `subdosec -initkey your-key`")
     if mode == 'public': 
         print(f"[WARNING] You don't use private mode, the result will be public.")
     return apikey, output_scan, host_scan
 
 def fetch_fingerprints(host_scan):
-    """Fetch and return fingerprints from the host_scan endpoint."""
     url = host_scan.replace('/api/scan/cli', '/api/getfinger')
     response = requests.get(url)
     response.raise_for_status()
     return response.json()
 
 def extract_title(content):
-    """Extract and return the title from the given HTML content."""
     soup = BeautifulSoup(content, 'html.parser')
     return soup.title.string if soup.title else 'No title found'
+
+async def undetect_site(siteinfo, apikey, host_scan, mode):
+    url = host_scan.replace('/api/scan/cli', '/api/undetect/stored/cli')
+    headers = {'Subdosec-Apikey': apikey}
+    web_data_encoded = base64.b64encode(json.dumps(siteinfo.get('website_data')).encode('utf-8')).decode('utf-8')
+    payload = {
+        'web_data': web_data_encoded,
+        'mode': mode
+    }
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, headers=headers, json=payload)
+        return response.json()
 
 def analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints):
     """Analyze a single target and print the results."""
@@ -69,12 +80,12 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints):
         title = extract_title(response.content)
         status_code = response.status_code
         redirect_url = response.url if response.history else 'No redirects'
+ 
+        match_response = []
 
-        vulns = "NOT VULN"
-        services = ""
 
         for fingerprint in fingerprints['fingerprints']:
-            in_body_match = 'in_body' in fingerprint['rules'] and fingerprint['rules'].get('in_body') in response.text
+            in_body_match = fingerprint['rules'].get('in_body', 'subdosec') in response.text
             fingerprint_encode = base64.b64encode(json.dumps(fingerprint).encode('utf-8')).decode('utf-8')
 
             # Send POST request to host_scan endpoint
@@ -85,19 +96,22 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints):
                 'sc_fu': status_code,
                 'body_fu': in_body_match,
                 'redirect_url': redirect_url,
-                'fingerprint_new': fingerprint_encode
+                'fingerprint_new': fingerprint_encode,
             })
 
-            response_data = scan_response.json()
+            match_response.append(scan_response.json())
 
-            if response_data.get('isMatched'):
-                vulns = "VULN"
-                matched_services = response_data.get('isMatched')
-                services = ', '.join(matched_services) if isinstance(matched_services, list) else str(matched_services)
-                services = output_scan + services
+        service_found = False
+        for item in match_response:
+            if item.get('isMatched') == True:
+                print(f"[VULN] {output_scan}{item.get('service')}")
+                service_found = True
+                break
 
-        services = services or ""
-        print(f"[{vulns}] {target} | {services}")
+        if not service_found:
+            print(f"[UNDETECT] {target}")
+            asyncio.run(undetect_site(match_response[0], apikey, host_scan, mode))
+
 
     except HTTPError as e:
         print(f"[HTTP Error] {target} : {e}")
