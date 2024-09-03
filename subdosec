@@ -10,7 +10,7 @@ from requests.exceptions import RequestException, HTTPError, ConnectionError
 from dotenv import load_dotenv, set_key
 from bs4 import BeautifulSoup
 import urllib3
-import httpx
+import aiohttpx
 import asyncio
 
 # Disable SSL warnings
@@ -69,9 +69,10 @@ async def undetect_site(siteinfo, apikey, host_scan, mode):
         'web_data': web_data_encoded,
         'mode': mode
     }
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, headers=headers, json=payload)
-        return response.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers, json=payload) as response:
+           return await response.json()
+
 
 def analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints, vuln_only):
     """Analyze a single target and print the results."""

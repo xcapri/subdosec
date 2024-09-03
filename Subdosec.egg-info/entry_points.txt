@@ -1,0 +1,3 @@
+[console_scripts]
+subdosec = subdosec_.main:main
+
