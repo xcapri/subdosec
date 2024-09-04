@@ -15,7 +15,8 @@ setup(
         'python-dotenv',
         'beautifulsoup4',
         'urllib3',
-        'aiohttp'
+        'aiohttp',
+        'pyfiglet'
     ],
     entry_points={
         'console_scripts': [

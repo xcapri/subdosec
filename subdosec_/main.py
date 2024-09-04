@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 import urllib3
 import aiohttp
 import asyncio
+import pyfiglet
 
 # Disable SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -138,6 +139,7 @@ def scan_by_web(mode, vuln_only):
 
 def main():
     """Entry point for the script."""
+    print(f"{pyfiglet.figlet_format('Subdosec')}\n")
     parser = argparse.ArgumentParser(description='Web scanner.')
     parser.add_argument('-mode', choices=['private', 'public'], default='public', help='Mode of operation (private/public)')
     parser.add_argument('-initkey', help='Initialize the API key')
