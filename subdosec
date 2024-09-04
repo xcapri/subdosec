@@ -75,7 +75,7 @@ async def undetect_site(siteinfo, apikey, host_scan, mode):
            return await response.json()
 
 
-def analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints, vuln_only):
+def analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints, vuln_only, pe):
     """Analyze a single target and print the results."""
     try:
         response = requests.get(target, verify=False, allow_redirects=False, timeout=30)
@@ -91,9 +91,9 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints, v
             fingerprint_encoded = base64.b64encode(json.dumps(fingerprint).encode('utf-8')).decode('utf-8')
             progress = (index / count_finger) * 100  # Calculate percentage progress
             output_line = f"{target} [{progress:.2f}%]"
-            if not vuln_only:
-                sys.stdout.write(f"\r{output_line}")
-                sys.stdout.flush()
+
+            sys.stdout.write(f"\r{output_line}")
+            sys.stdout.flush()
 
             scan_payload = {
                 'target': target,
@@ -115,16 +115,11 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints, v
             asyncio.run(undetect_site(match_response[0], apikey, host_scan, mode))
         else:
             pass 
-    except HTTPError as e:
-        print(f"[HTTP Error] {target} : {e}")
-    except ConnectionError as e:
-        print(f"[Connection Error] {target} : {e}")
-    except RequestException as e:
-        print(f"[Request Error] {target} : {e}")
-    except Exception as e:
-        print(f"[Error] {target} : {e}")
 
-def scan_by_web(mode, vuln_only):
+    except Exception as e:
+        if pe: print(f"[Error] {target} : {e}")
+        
+def scan_by_web(mode, vuln_only, pe):
     """Main function to perform the web scanning."""
     try:
         apikey, output_scan, host_scan = load_env_vars(mode)
@@ -132,7 +127,7 @@ def scan_by_web(mode, vuln_only):
         targets = [line.strip() for line in sys.stdin]
 
         for target in targets:
-            analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints, vuln_only)
+            analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints, vuln_only, pe)
 
     except ValueError as e:
         print(f"[Configuration Error] {e}")
@@ -144,13 +139,14 @@ def main():
     parser.add_argument('-mode', choices=['private', 'public'], default='public', help='Mode of operation (private/public)')
     parser.add_argument('-initkey', help='Initialize the API key')
     parser.add_argument('-vo', action='store_true', help='VULN Only: Hide UNDETECT messages')
+    parser.add_argument('-pe', action='store_true', help='Print Error: When there are problems detecting your target')
     
     args = parser.parse_args()
 
     if args.initkey:
         init_key(args.initkey)
     else:
-        scan_by_web(args.mode, args.vo)
+        scan_by_web(args.mode, args.vo, args.pe)
 
 if __name__ == "__main__":
     main()
