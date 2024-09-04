@@ -1,11 +1,13 @@
-# Subdosec
+<p align="center">
+<b>Subdosec</b>
+</p>
 
 <p align="center">
   <a href="#installation">Install</a> •
   <a href="#running-subdosec">Usage</a> •
   <a href="#web-based">Web Based</a> •
   <a href="#online-scan">Online scan</a> •
-  <a href="">Join Telegram</a>
+  <a href="https://t.me/+wss0Fj5zc81iM2Nl">Join Telegram</a>
 </p>
 
 ---
@@ -16,14 +18,14 @@ Subdosec is not just a fast and accurate subdomain takeover scanner with no fals
 
 ---
 
-# Install
+# Installation
 
 To install, simply run the following command: 
 ``python3 -m pip install git+https://github.com/xcapri/subdosec.git``. 
 If there is an update, you can run the same command by adding the --upgrade argument.
 
 ---
-# Usage
+# Running subdosec
 
 ```
 $ subdosec -h
@@ -72,7 +74,7 @@ For example, you search for a site that is not detected as vulnerable by subdose
 
 ![Undetec](img/undetec_sample.png)
 
-After that you analyze it turns out that the service is vulnerable to subdomain takeover. then you can send the fingerprint information to us via telgram channel xxx.com.
+After that you analyze it turns out that the service is vulnerable to subdomain takeover. then you can send the fingerprint information to us via telgram channel [Subdosec Group](https://t.me/+wss0Fj5zc81iM2Nl).
 
 Dynamically you can use this element for rules ``title, cname, status_code, in_body, a_record, redirect``:
 
