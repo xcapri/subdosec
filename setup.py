@@ -6,7 +6,7 @@ setup(
     author='xcapri',
     author_email='N/A',
     url='https://github.com/xcapri/subdosec',
-    version='0.5',
+    version='0.6',
     package_data={"subdosec_": ["config/*"]},
     include_package_data=True,
     packages=find_packages(),

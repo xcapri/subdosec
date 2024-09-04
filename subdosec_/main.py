@@ -51,7 +51,7 @@ def load_env_vars(mode):
 def fetch_fingerprints(host_scan):
     """Fetch fingerprints from the host scan API."""
     url = host_scan.replace('/api/scan/cli', '/api/getfinger')
-    response = requests.get(url)
+    response = requests.get(url,  timeout=30)
     response.raise_for_status()
     return response.json()
 
@@ -73,18 +73,26 @@ async def undetect_site(siteinfo, apikey, host_scan, mode):
         async with session.post(url, headers=headers, json=payload) as response:
            return await response.json()
 
+
 def analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints, vuln_only):
     """Analyze a single target and print the results."""
     try:
-        response = requests.get(target, verify=False)
+        response = requests.get(target, verify=False, allow_redirects=False, timeout=30)
         title = extract_title(response.content)
         status_code = response.status_code
         redirect_url = response.url if response.history else 'No redirects'
 
+        count_finger = len(fingerprints['fingerprints'])
+
         match_response = []
-        for fingerprint in fingerprints['fingerprints']:
+        for index, fingerprint in enumerate(fingerprints['fingerprints'], start=1):
             in_body_match = fingerprint['rules'].get('in_body', 'subdosec') in response.text
             fingerprint_encoded = base64.b64encode(json.dumps(fingerprint).encode('utf-8')).decode('utf-8')
+            progress = (index / count_finger) * 100  # Calculate percentage progress
+            output_line = f"{target} [{progress:.2f}%]"
+            if not vuln_only:
+                sys.stdout.write(f"\r{output_line}")
+                sys.stdout.flush()
 
             scan_payload = {
                 'target': target,
@@ -100,11 +108,12 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints, v
 
         if any(item.get('isMatched') for item in match_response):
             service = next(item.get('service') for item in match_response if item.get('isMatched'))
-            print(f"[VULN] {target} | {output_scan}{service}")
+            print(f" [VULN] {output_scan}{service}")
         elif not vuln_only:
-            print(f"[UNDETECT] {target}")
+            print(f" [UNDETECT]")
             asyncio.run(undetect_site(match_response[0], apikey, host_scan, mode))
-
+        else:
+            pass 
     except HTTPError as e:
         print(f"[HTTP Error] {target} : {e}")
     except ConnectionError as e:
