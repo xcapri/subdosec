@@ -190,12 +190,15 @@ def main():
     parser.add_argument('-initkey', help='Initialize the API key')
     parser.add_argument('-vo', action='store_true', help='VULN Only: Hide UNDETECT messages')
     parser.add_argument('-pe', action='store_true', help='Print Error: When there are problems detecting your target')
+    parser.add_argument('-ins', action='store_true', help='Prepar node & start server')
     
     args = parser.parse_args()
 
     
     if args.initkey:
         init_key(args.initkey)
+    elif args.ins:
+        run_node_server()
     else:
         scan_by_web(args.mode, args.vo, args.pe)
 
