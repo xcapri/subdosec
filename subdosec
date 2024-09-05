@@ -13,9 +13,36 @@ import urllib3
 import aiohttp
 import asyncio
 import pyfiglet
+import subprocess
+import threading
+import platform
 
 # Disable SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+def run_node_server():
+    """Start the Node.js server in the background, supporting both Windows and Linux, without displaying output."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    node_dir = os.path.join(script_dir, 'subdosec_/node')
+    js_loc = os.path.join(node_dir, 'scan.js')
+    node_modules_dir = os.path.join(node_dir, 'node_modules')
+
+    npm_path = 'npm.cmd' if platform.system() == 'Windows' else 'npm'
+
+    if os.path.exists(node_dir):
+        os.chdir(node_dir)
+    else:
+        raise FileNotFoundError(f"Node directory not found: {node_dir}")
+
+    if not os.path.exists(node_modules_dir):
+        subprocess.run([npm_path, 'i'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+
+    process = subprocess.Popen(['node', js_loc], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    process.communicate(timeout=5)
+    
+    return process
+
 
 def init_key(apikey):
     """Initialize the API key in the .env file."""
@@ -89,7 +116,6 @@ async def vuln_site(siteinfo, fingerprint_id, apikey, host_scan_prod, mode):
     async with aiohttp.ClientSession() as session:
         async with session.post(url, headers=headers, json=payload) as response:
            return await response.json()
-
 
 def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod, fingerprints, vuln_only, pe):
     """Analyze a single target and print the results."""
@@ -167,6 +193,7 @@ def main():
     
     args = parser.parse_args()
 
+    
     if args.initkey:
         init_key(args.initkey)
     else:

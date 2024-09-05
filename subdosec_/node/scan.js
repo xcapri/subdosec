@@ -34,8 +34,7 @@ app.post('/local/scan', async (req, res) => {
 
         const cname_records = await resolveRecords_cli('Cname', subdomain);
         const a_records = await resolveRecords_cli('4', subdomain);
-        console.log(cname_records)
-        console.log(a_records)
+
         const response_body_base64 = body_fu;
 
 

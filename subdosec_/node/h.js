@@ -18,7 +18,7 @@ async function resolveRecords_cli(type, subdomain) {
 }
 
 async function match_finger_cli(website_data, mode, fingerprint) {
-    console.log(`response_body_base64 : ${website_data.response_body_base64}`)
+    // console.log(`response_body_base64 : ${website_data.response_body_base64}`)
 
     // const fingerprints = await load_fingerprints_from_db_cli();
     const matchedFingerprints = [];
