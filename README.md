@@ -123,4 +123,5 @@ We greatly appreciate any contributions you make. If you have suggestions, feedb
 
 
 # Best regards
-xcapri & tegalsec
+[Xcapri](https://github.com/xcapri),
+[Tegalsec](https://github.com/tegal1337)
