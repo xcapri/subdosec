@@ -1,1 +1,2 @@
 include subdosec_/config/*
+include subdosec_/node/*
