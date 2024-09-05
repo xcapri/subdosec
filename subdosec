@@ -36,6 +36,7 @@ def load_env_vars(mode):
     apikey = os.getenv('APIKEY') if mode == 'private' else os.getenv('PUBLIC_API_KEY')
     output_scan = os.getenv('OUTPUT_SCAN_PRIV') if mode == 'private' else os.getenv('OUTPUT_SCAN_PUB')
     host_scan = os.getenv('SCAN_API_HOST')
+    host_scan_prod = os.getenv('PROD_SCAN_API_HOST')
 
     if not all([host_scan, output_scan]):
         raise ValueError("Missing required environment variables.")
@@ -47,11 +48,11 @@ def load_env_vars(mode):
     if mode == 'public':
         print("[WARNING] You are not using private mode; results will be public.")
     
-    return apikey, output_scan, host_scan
+    return apikey, output_scan, host_scan, host_scan_prod
 
-def fetch_fingerprints(host_scan):
+def fetch_fingerprints(host_scan_prod):
     """Fetch fingerprints from the host scan API."""
-    url = host_scan.replace('/api/scan/cli', '/api/getfinger')
+    url = host_scan_prod.replace('/api/scan/cli', '/api/getfinger')
     response = requests.get(url,  timeout=30)
     response.raise_for_status()
     return response.json()
@@ -61,9 +62,9 @@ def extract_title(content):
     soup = BeautifulSoup(content, 'html.parser')
     return soup.title.string if soup.title else 'No title found'
 
-async def undetect_site(siteinfo, apikey, host_scan, mode):
+async def undetect_site(siteinfo, apikey, host_scan_prod, mode):
     """Notify the server about undetected sites."""
-    url = host_scan.replace('/api/scan/cli', '/api/undetect/stored/cli')
+    url = host_scan_prod.replace('/api/scan/cli', '/api/undetect/stored/cli')
     headers = {'Subdosec-Apikey': apikey}
     web_data_encoded = base64.b64encode(json.dumps(siteinfo.get('website_data')).encode('utf-8')).decode('utf-8')
     payload = {
@@ -73,10 +74,26 @@ async def undetect_site(siteinfo, apikey, host_scan, mode):
     async with aiohttp.ClientSession() as session:
         async with session.post(url, headers=headers, json=payload) as response:
            return await response.json()
+        
+
+async def vuln_site(siteinfo, fingerprint_id, apikey, host_scan_prod, mode):
+    """Notify the server about undetected sites."""
+    url = host_scan_prod.replace('/api/scan/cli', '/api/vuln/stored/cli')
+    headers = {'Subdosec-Apikey': apikey}
+    web_data_encoded = base64.b64encode(json.dumps(siteinfo).encode('utf-8')).decode('utf-8')
+    payload = {
+        'web_data': web_data_encoded,
+        'mode': mode,
+        'fingerprint_id': fingerprint_id
+    }
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers, json=payload) as response:
+           return await response.json()
 
 
-def analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints, vuln_only, pe):
+def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod, fingerprints, vuln_only, pe):
     """Analyze a single target and print the results."""
+
     try:
         response = requests.get(target, verify=False, allow_redirects=False, timeout=30)
         title = extract_title(response.content)
@@ -108,26 +125,33 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints, v
             match_response.append(scan_response.json())
 
         if any(item.get('isMatched') for item in match_response):
-            service = next(item.get('service') for item in match_response if item.get('isMatched'))
+     
+            service = next(item.get('service').get('service') for item in match_response if item.get('isMatched'))
+            web_data = next(item.get('website_data') for item in match_response if item.get('isMatched'))
+            fingerprint_id = next(item.get('service').get('fid') for item in match_response if item.get('isMatched'))
+
             print(f" [VULN] {output_scan}{service}")
+            asyncio.run(vuln_site(web_data, fingerprint_id, apikey, host_scan_prod, mode))
+
+
         elif not vuln_only:
             print(f" [UNDETECT]")
-            asyncio.run(undetect_site(match_response[0], apikey, host_scan, mode))
+            asyncio.run(undetect_site(match_response[0], apikey, host_scan_prod, mode))
         else:
             pass 
 
     except Exception as e:
         if pe: print(f"[Error] {target} : {e}")
-        
+
 def scan_by_web(mode, vuln_only, pe):
     """Main function to perform the web scanning."""
     try:
-        apikey, output_scan, host_scan = load_env_vars(mode)
-        fingerprints = fetch_fingerprints(host_scan)
+        apikey, output_scan, host_scan, host_scan_prod  = load_env_vars(mode)
+        fingerprints = fetch_fingerprints(host_scan_prod)
         targets = [line.strip() for line in sys.stdin]
 
         for target in targets:
-            analyze_target(target, mode, apikey, output_scan, host_scan, fingerprints, vuln_only, pe)
+            analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod, fingerprints, vuln_only, pe)
 
     except ValueError as e:
         print(f"[Configuration Error] {e}")
