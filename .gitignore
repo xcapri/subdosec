@@ -1,3 +1,4 @@
 *.txt
 gassmeteor
 subdosec_/node/node_modules/
+subdosec_/node/packake-lock.json
