@@ -22,7 +22,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def run_node_server():
-    """Start the Node.js server in the background, supporting both Windows and Linux, without displaying output."""
+    """Start the Node.js server in the background, supporting both Windows and Linux, without displaying output, and then terminate the Python script."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     node_dir = os.path.join(script_dir, 'node')
     js_loc = os.path.join(node_dir, 'scan.js')
@@ -30,18 +30,37 @@ def run_node_server():
 
     npm_path = 'npm.cmd' if platform.system() == 'Windows' else 'npm'
 
-    if os.path.exists(node_dir):
-        os.chdir(node_dir)
-    else:
-        raise FileNotFoundError(f"Node directory not found: {node_dir}")
+    try:
+        if os.path.exists(node_dir):
+            os.chdir(node_dir)
+        else:
+            raise FileNotFoundError(f"Node directory not found: {node_dir}")
 
-    if not os.path.exists(node_modules_dir):
-        subprocess.run([npm_path, 'i'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        if not os.path.exists(node_modules_dir):
+            print("Installing Node.js modules...")
+            subprocess.run([npm_path, 'i'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+            print("Node.js modules installed.")
 
-    process = subprocess.Popen(['node', js_loc], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    process.communicate(timeout=5)
-    
-    return process
+        print("Starting Node.js server...")
+        process = subprocess.Popen(['node', js_loc], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            process.communicate(timeout=10)
+            print("Node.js server started successfully.")
+        except subprocess.TimeoutExpired:
+            print("Node.js server did not start within the expected time. It may still be running.")
+
+        # Exit the Python script
+        sys.exit(0)
+
+    except FileNotFoundError as fnf_error:
+        print(f"[Error] {fnf_error}")
+        sys.exit(1)
+    except subprocess.CalledProcessError as cpe_error:
+        print(f"[Error] Failed to install Node.js modules: {cpe_error}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"[Error] An unexpected error occurred while starting the Node.js server: {e}")
+        sys.exit(1)
 
 
 def init_key(apikey):
@@ -73,7 +92,7 @@ def load_env_vars(mode):
         raise ValueError(f"Create a password & apikey first at {signup_url}.\nThen run `subdosec -initkey your-key`")
     
     if mode == 'public':
-        print("[WARNING] You are not using private mode; results will be public.")
+        print(f"[WARNING] You are not using private mode; results will be public.")
     
     return apikey, output_scan, host_scan, host_scan_prod
 
