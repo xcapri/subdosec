@@ -53,7 +53,7 @@ $ subdosec -h
 
 
 
-usage: main.py [-h] [-mode {private,public}] [-initkey INITKEY] [-vo] [-pe] [-ins] [-lf LF]
+usage: main.py [-h] [-mode {private,public}] [-initkey INITKEY] [-vo] [-pe] [-ins] [-lf LF] [-sfid]
 
 Web scanner.
 
@@ -65,8 +65,8 @@ options:
   -vo                   VULN Only: Hide UNDETECT messages
   -pe                   Print Error: When there are problems detecting your target
   -ins                  Prepar node & start server
-  -lf LF                To focus on one or multiple fingerprints. (-lf github.io,surge.sh) and leave this arg to scan all fingerprints
-
+  -lf LF                Fingerprint lock: to focus on one or multiple fingerprints. (-lf github.io,surge.sh) and leave this arg to scan all fingerprints
+  -sfid                 To view all available fingerprint ids.
 ```
 
 Every subdomain takeover scan will default to the public dashboard https://subdosec.vulnshot.com/scan#vulnlist, so the following commands can be used:

@@ -72,29 +72,34 @@ def init_key(apikey):
     set_key(env_file, 'APIKEY', apikey)
     print(f"API key has been written to {env_file}")
 
-def load_env_vars(mode):
-    """Load environment variables based on the mode."""
+def load_env_vars(mode, *vars_to_load):
+    """Load environment variables based on the mode and return only the requested ones."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     env_file = os.path.join(script_dir, 'config/.env')
 
     load_dotenv(dotenv_path=env_file)
 
-    apikey = os.getenv('APIKEY') if mode == 'private' else os.getenv('PUBLIC_API_KEY')
-    output_scan = os.getenv('OUTPUT_SCAN_PRIV') if mode == 'private' else os.getenv('OUTPUT_SCAN_PUB')
-    host_scan = os.getenv('SCAN_API_HOST')
-    host_scan_prod = os.getenv('PROD_SCAN_API_HOST')
+    env_vars = {
+        'apikey': os.getenv('APIKEY') if mode == 'private' else os.getenv('PUBLIC_API_KEY'),
+        'output_scan': os.getenv('OUTPUT_SCAN_PRIV') if mode == 'private' else os.getenv('OUTPUT_SCAN_PUB'),
+        'host_scan': os.getenv('SCAN_API_HOST'),
+        'host_scan_prod': os.getenv('PROD_SCAN_API_HOST'),
+    }
 
-    if not all([host_scan, output_scan]):
+    if not all([env_vars['host_scan'], env_vars['output_scan']]):
         raise ValueError("Missing required environment variables.")
     
-    if mode == 'private' and not apikey:
+    if mode == 'private' and not env_vars['apikey']:
         signup_url = os.getenv('SIGNUP_URL')
         raise ValueError(f"Create a password & apikey first at {signup_url}.\nThen run `subdosec -initkey your-key`")
     
     if mode == 'public':
         print(f"[WARNING] You are not using private mode; results will be public.")
     
-    return apikey, output_scan, host_scan, host_scan_prod
+    if vars_to_load:
+        return {var: env_vars[var] for var in vars_to_load if var in env_vars}
+    return env_vars
+
 
 def fetch_fingerprints(host_scan_prod):
     """Fetch fingerprints from the host scan API."""
@@ -187,10 +192,26 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
     except Exception as e:
         if pe: print(f"[Error] {target} : {e}")
 
+def check_fingerprint():
+    try:
+        apikey, output_scan, host_scan, host_scan_prod = (
+            load_env_vars('public', 'apikey', 'output_scan', 'host_scan', 'host_scan_prod').values()
+        )
+
+        fingerprints = fetch_fingerprints(host_scan_prod)
+        
+        for fingerprint in fingerprints['fingerprints']:
+            service = fingerprint['service']
+            name = fingerprint['name']
+            print(f"{service} | {name}")
+
+    except Exception as e:
+        print(f"[Error] : {e}")
+
 def scan_by_web(mode, vuln_only, pe, lf):
     """Main function to perform the web scanning."""
     try:
-        apikey, output_scan, host_scan, host_scan_prod = load_env_vars(mode)
+        apikey, output_scan, host_scan, host_scan_prod = load_env_vars('public', 'apikey', 'output_scan', 'host_scan', 'host_scan_prod').values()
         fingerprints = fetch_fingerprints(host_scan_prod)
 
         lf_list = [x.strip() for x in lf.split(',')]
@@ -203,8 +224,6 @@ def scan_by_web(mode, vuln_only, pe, lf):
         }
 
         final_finger = filtered_fingerprints if lf != 'all' else fingerprints
-
-
         targets = [line.strip() for line in sys.stdin]
 
         for target in targets:
@@ -224,6 +243,7 @@ def main():
     parser.add_argument('-pe', action='store_true', help='Print Error: When there are problems detecting your target')
     parser.add_argument('-ins', action='store_true', help='Prepar node & start server')
     parser.add_argument('-lf', default='all',  help='Fingerprint lock: to focus on one or multiple fingerprints. (-lf github.io,surge.sh) and leave this arg to scan all fingerprints')
+    parser.add_argument('-sfid', action='store_true',  help='To view all available fingerprint ids.')
     
     args = parser.parse_args()
 
@@ -232,6 +252,8 @@ def main():
         init_key(args.initkey)
     elif args.ins:
         run_node_server()
+    elif args.sfid:
+        check_fingerprint()
     else:
         scan_by_web(args.mode, args.vo, args.pe, args.lf)
 
