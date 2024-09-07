@@ -178,7 +178,6 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
             print(f" [VULN] {output_scan}{service}")
             asyncio.run(vuln_site(web_data, fingerprint_id, apikey, host_scan_prod, mode))
 
-
         elif not vuln_only:
             print(f" [UNDETECT]")
             asyncio.run(undetect_site(match_response[0], apikey, host_scan_prod, mode))
@@ -188,18 +187,32 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
     except Exception as e:
         if pe: print(f"[Error] {target} : {e}")
 
-def scan_by_web(mode, vuln_only, pe):
+def scan_by_web(mode, vuln_only, pe, lf):
     """Main function to perform the web scanning."""
     try:
-        apikey, output_scan, host_scan, host_scan_prod  = load_env_vars(mode)
+        apikey, output_scan, host_scan, host_scan_prod = load_env_vars(mode)
         fingerprints = fetch_fingerprints(host_scan_prod)
+
+        lf_list = [x.strip() for x in lf.split(',')]
+        
+        filtered_fingerprints = {
+            "fingerprints": [
+                fingerprint for fingerprint in fingerprints['fingerprints']
+                if fingerprint['service'] in lf_list
+            ]
+        }
+
+        final_finger = filtered_fingerprints if lf != 'all' else fingerprints
+
+
         targets = [line.strip() for line in sys.stdin]
 
         for target in targets:
-            analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod, fingerprints, vuln_only, pe)
+            analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod, final_finger, vuln_only, pe)
 
     except ValueError as e:
         print(f"[Configuration Error] {e}")
+
 
 def main():
     """Entry point for the script."""
@@ -210,6 +223,7 @@ def main():
     parser.add_argument('-vo', action='store_true', help='VULN Only: Hide UNDETECT messages')
     parser.add_argument('-pe', action='store_true', help='Print Error: When there are problems detecting your target')
     parser.add_argument('-ins', action='store_true', help='Prepar node & start server')
+    parser.add_argument('-lf', default='all',  help='Fingerprint lock: to focus on one or multiple fingerprints. (-lf github.io,surge.sh) and leave this arg to scan all fingerprints')
     
     args = parser.parse_args()
 
@@ -219,7 +233,7 @@ def main():
     elif args.ins:
         run_node_server()
     else:
-        scan_by_web(args.mode, args.vo, args.pe)
+        scan_by_web(args.mode, args.vo, args.pe, args.lf)
 
 if __name__ == "__main__":
     main()

@@ -25,7 +25,7 @@ To install, ensure that Node.js is already installed on your machine, and then s
 ``python3 -m pip install git+https://github.com/xcapri/subdosec.git``. 
 If there is an update, you can run the same command by adding the ``--upgrade`` argument.
 
-Then run
+Then run this every time you start a new terminal session.
 
 ```
 $ subdosec -ins
@@ -53,7 +53,7 @@ $ subdosec -h
 
 
 
-usage: main.py [-h] [-mode {private,public}] [-initkey INITKEY] [-vo] [-pe]
+usage: main.py [-h] [-mode {private,public}] [-initkey INITKEY] [-vo] [-pe] [-ins] [-lf LF]
 
 Web scanner.
 
@@ -64,6 +64,8 @@ options:
   -initkey INITKEY      Initialize the API key
   -vo                   VULN Only: Hide UNDETECT messages
   -pe                   Print Error: When there are problems detecting your target
+  -ins                  Prepar node & start server
+  -lf LF                To focus on one or multiple fingerprints. (-lf github.io,surge.sh) and leave this arg to scan all fingerprints
 
 ```
 
