@@ -145,7 +145,7 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
             raise Exception(f"Too many redirects for {target}, skipping...")
 
         title = extract_title(response.text)
-        status_code = response.status_code
+        status_code = response.history[0].status_code if response.history else response.status_code
         redirect_url = response.url if response.history else 'No redirects'
 
 
