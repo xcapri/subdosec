@@ -140,10 +140,14 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
     """Analyze a single target and print the results."""
 
     try:
-        response = requests.get(target, verify=False, allow_redirects=False, timeout=30)
-        title = extract_title(response.content)
+        response = requests.get(target, verify=False, allow_redirects=True, timeout=30)
+        if len(response.history) > 2:
+            raise Exception(f"Too many redirects for {target}, skipping...")
+
+        title = extract_title(response.text)
         status_code = response.status_code
         redirect_url = response.url if response.history else 'No redirects'
+
 
         count_finger = len(fingerprints['fingerprints'])
 
