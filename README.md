@@ -8,7 +8,7 @@
   <a href="#web-based">Web Based</a> •
   <a href="#online-scan">Online scan</a> •
   <a href="#contribution">Contribution</a> •
-  <a href="https://t.me/+wss0Fj5zc81iM2Nl">Join Telegram</a>
+  <a href="https://t.me/subdosec">Join Telegram</a>
 </p>
 
 ---
@@ -92,7 +92,7 @@ For example, you search for a site that is not detected as vulnerable by subdose
 
 ![Undetec](img/undetec_sample.png)
 
-After that you analyze it turns out that the service is vulnerable to subdomain takeover. then you can send the fingerprint information to us via telgram channel [Subdosec Group](https://t.me/+wss0Fj5zc81iM2Nl).
+After that you analyze it turns out that the service is vulnerable to subdomain takeover. then you can send the fingerprint information to us via telgram channel [Subdosec Group](https://t.me/subdosec).
 
 Dynamically you can use this element for rules ``title, cname, status_code, in_body, a_record, redirect``:
 
