@@ -43,6 +43,11 @@ Node.js server started successfully.
 ---
 # Running subdosec
 
+<b>[WARNING]
+_Do not takeover all subdomains in test.txt,_
+let everyone use that for demos.
+</b>
+
 ```
 $ subdosec -h
  ____        _         _
