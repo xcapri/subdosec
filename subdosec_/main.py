@@ -19,6 +19,7 @@ import socket
 import random
 import time
 import psutil
+from urllib.parse import urlparse
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -276,7 +277,7 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
 
         status_code = response.history[0].status_code if response.history else response.status_code
         redirect_url = response.url if response.history else 'No redirects'
-
+        clean_redirect_url = urlparse(redirect_url)._replace(query="").geturl()
         count_finger = len(fingerprints['fingerprints'])
 
         match_response = []
@@ -295,7 +296,7 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
                 'title_fu': title,
                 'sc_fu': status_code,
                 'body_fu': in_body_match,
-                'redirect_url': redirect_url,
+                'redirect_url': clean_redirect_url,
                 'fingerprint_new': fingerprint_encoded,
             }
             scan_response = requests.post(host_scan, headers={'Subdosec-Apikey': apikey}, json=scan_payload)
