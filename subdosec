@@ -2,6 +2,7 @@
 
 import sys
 import os
+import re
 import json
 import base64
 import argparse
@@ -18,10 +19,55 @@ from requests.exceptions import SSLError
 import socket
 import random
 import time
+import itertools
 import psutil
 from urllib.parse import urlparse
+import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from contextlib import contextmanager
+import threading
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+@contextmanager
+def suppress_stderr():
+    """Suppress stderr output at both Python and C/C++ library levels."""
+    stderr_fd = sys.stderr.fileno()
+    # Save a copy of the original stderr file descriptor
+    with os.fdopen(os.dup(stderr_fd), 'wb') as old_stderr:
+        # Redirect stderr to /dev/null
+        with open(os.devnull, 'wb') as devnull:
+            os.dup2(devnull.fileno(), stderr_fd)
+        try:
+            yield
+        finally:
+            # Restore stderr
+            os.dup2(old_stderr.fileno(), stderr_fd)
+
+# --------------------- LOADING SPINNER -----------------------
+
+class Spinner:
+    def __init__(self, message="Processing..."):
+        self.spinner = itertools.cycle(['|', '/', '-', '\\'])
+        self.stop_running = False
+        self.message = message
+
+    def start(self):
+        def run():
+            while not self.stop_running:
+                sys.stdout.write(f"\r{self.message} {next(self.spinner)}")
+                sys.stdout.flush()
+                time.sleep(0.1)
+            sys.stdout.write("\r" + " " * (len(self.message) + 2) + "\r")
+            sys.stdout.flush()
+
+        self.thread = threading.Thread(target=run)
+        self.thread.start()
+
+    def stop(self):
+        self.stop_running = True
+        self.thread.join()
 
 
 def is_port_in_use(port):
@@ -328,19 +374,205 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
     except Exception as e:
         if pe: print(f"[Error] {target} : {e}")
 
-def check_fingerprint():
+def check_fingerprint(p):
     try:
         _, _, _, host_scan_prod, _ = load_env_vars('public')
         fingerprints = fetch_fingerprints(host_scan_prod, False)
+        
+        output = []
         
         for fingerprint in fingerprints['fingerprints']:
             service = fingerprint['service']
             name = fingerprint['name']
             status = "[False Positive]" if fingerprint['status_fingerprint'] == 1 else "[Active]"
-            print(f"{service} | {name} {status}")
+            
+            entry = {
+                "service": service,
+                "name": name,
+                "status": status
+            }
+
+            output.append(entry)
+
+            if p == 1:
+                print(f"{service} | {name} {status}")
+
+        return output
 
     except Exception as e:
         print(f"[Error] : {e}")
+        return []
+
+
+def analyze_with_gemini(data_file):
+    try:
+        # Load original undetect.json
+        with open(data_file, 'r', encoding='utf-8') as f:
+            raw_data = json.load(f)
+
+        # Load fingerprints
+        fingerprints = check_fingerprint(0)
+        fingerprint_services = [fp['service'] for fp in fingerprints]
+
+        # Clean data: remove entries whose CNAME matches any fingerprint service
+        cleaned_data = []
+        skipped_count = 0
+
+        for entry in raw_data:
+            cnamelist = entry.get('cname_records') or []
+            is_fp = False
+            for cname in cnamelist:
+                if any(cname.endswith(fp_service) for fp_service in fingerprint_services):
+                    is_fp = True
+                    break
+            if not is_fp:
+                cleaned_data.append(entry)
+            else:
+                skipped_count += 1
+
+        print(f"[INFO] PURE UNDETECTED {skipped_count} | Subdomains are not detected as vulnerable even though they have passed the subdosec scan..\n")
+
+        if not cleaned_data:
+            print("[INFO] No new potential subdomains to analyze.\n")
+            return
+
+        # Ensure all entries have lists for cname and a_records
+        for entry in cleaned_data:
+            entry['cname_records'] = entry.get('cname_records') or []
+            entry['a_records'] = entry.get('a_records') or []
+
+        prompt = f"""
+        cat undetected.json
+        {json.dumps(cleaned_data, indent=4)}
+
+        Based on the CNAME record (clear the CNAME to the root domain as the service name) or A record, please find relevant documents/guides/articles on how to set up a custom domain, and read the guide on how to set up a custom domain on that service.
+
+        Possible vulnerable and non-vulnerable rules:
+
+        - If verification uses a CNAME based on user identity {{static not random}}.servicename.tld, it is vulnerable.
+        - If verification uses a CNAME based on user identity {{based on user domain or company name ,or anything related to user}}.servicename.tld, it is vulnerable.
+        - If verification uses a CNAME based on user identity {{static event provide from service}}.servicename.tld, it is vulnerable.
+        - If verification uses a CNAME based on user identity {{user/company/rootdomain/static cname provider from service/load-balancer}}.servicename.tld but there is TXT record verification, it is not vulnerable.
+        - If verification uses a random cname {{random}}.servicename.tld, it is not vulnerable.
+        - If there is a verification keyword for ownership by TXT record or any dynamic record, it is not vulnerable.
+        - If verification is performed without a TXT record and without a dynamic CNAME, the site is potentially vulnerable to subdomain hijacking attacks.
+        - But conversely, if the user requires verification using a TXT record, it is not vulnerable.
+        - If the cname/a record information I provided is in the can-t-takeover repository, please read that and identify whether it is vulnerable, not vulnerable, or vulnerable (edge case).
+        * For txt records, there is no need to compare them with the data I sent. That is the result. So focus on the indications from the custom domain article you read.
+        * The main rule is, if there is a TXT record keyword in the custom domain article, immediately consider it not vulnerable.
+        * The data I send is only used to display custom domain articles related to that service.
+        * Do not analyze and search for articles if the a/cname service information is contained in the fingerprint in the subdosec. (skip the process and output)
+        * Please find & read using latest article or docs.
+
+        Fingerprint subdosec
+        {fingerprints}
+
+        Then I want output from you only like this:
+        * If there are multiple domains on the same service in the data I sent, the output should only be one.
+
+        if multiple
+        ```
+        [
+        {{
+            "CNAME": "<cname-if-exists>",
+            "A_RECORD": "<a-record-if-exists>",
+            "DOMAIN": "<subdomain-provided>",
+            "TAKEOVER": "POSSIBLE",
+            "REASON": "simple reason",
+            "LINK_REFERENCE": "<docs-or-article-link>"
+        }},
+        {{
+            "CNAME": "<cname-if-exists>",
+            "A_RECORD": "<a-record-if-exists>",
+            "DOMAIN": "<subdomain-provided>",
+            "TAKEOVER": "NOT",
+            "REASON": "simple reason",
+            "LINK_REFERENCE": "<docs-or-article-link>"
+        }}
+        ]
+        ```
+        """
+
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        env_file = os.path.join(script_dir, 'subdosec_/config/.env')
+        load_dotenv(dotenv_path=env_file)
+
+        my_api_key = os.getenv('GEMINI_API_KEY')
+
+        # Check if API key is set
+        if not my_api_key or my_api_key.strip() == '':
+            print("[!] Gemini API key not found!")
+            print("[+] Please enter your Gemini API key.")
+            print("[+] You can get your API key from: https://aistudio.google.com/app/apikey\n")
+
+            # Prompt user for API key
+            user_api_key = input("Enter your Gemini API key: ").strip()
+
+            if not user_api_key:
+                print("[Error] No API key provided. Exiting...")
+                return
+
+            # Save the API key to .env file
+            set_key(env_file, 'GEMINI_API_KEY', user_api_key)
+            print(f"[+] API key has been saved to {env_file}\n")
+            my_api_key = user_api_key
+
+        # Start loading spinner
+        spinner = Spinner("Analyzing with Gemini")
+        spinner.start()
+
+        # Run Gemini with STDERR suppressed (including configuration and model initialization)
+        with suppress_stderr():
+            genai.configure(api_key=my_api_key)
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            response = model.generate_content(
+                prompt,
+                safety_settings={
+                    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                }
+            )
+
+        spinner.stop()
+
+        # Extract and print JSON result
+        try:
+            match = re.search(r"```json\s*(\[\s*{.*?}\s*\])\s*```", response.text, re.DOTALL)
+            if not match:
+                raise ValueError("Could not extract JSON from Gemini response.")
+
+            cleaned_json = match.group(1)
+            results = json.loads(cleaned_json)
+
+            print("NEW POTENTIAL :\n")
+            for entry in results:
+                cname = entry.get('CNAME', '-')
+                a_record = entry.get('A_RECORD') or []
+                if not isinstance(a_record, list):
+                    a_record = [a_record]
+
+                print(f"Domain     : {entry.get('DOMAIN', '-')}")
+                print(f"  CNAME    : {cname}")
+                print(f"  A Record : {', '.join(a_record)}")
+                print(f"  Takeover : {entry.get('TAKEOVER', '-')}")
+                print(f"  Reason   : {entry.get('REASON', '-')}")
+                print(f"  Reference: {entry.get('LINK_REFERENCE', '-')}")
+                print("=" * 80)
+
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"[Warning] Failed to parse JSON from response: {e}")
+            print("Raw response:")
+            print(response.text)
+
+    except FileNotFoundError:
+        print(f"[Error] File not found: {data_file}")
+    except json.JSONDecodeError:
+        print(f"[Error] Invalid JSON format in file: {data_file}")
+    except Exception as e:
+        print(f"[Error] An unexpected error occurred: {e}")
+
 
 def read_local_finger(file_path, host_scan_prod):
     cache_finger = fetch_fingerprints(host_scan_prod, False)
@@ -413,7 +645,7 @@ def main():
     parser.add_argument('-su', action='store_true', help='Skip undetect will not stored to server (https://subdosec.vulnshot.com/result/undetected)')
     parser.add_argument('-lu', type=str, help='Undetec stored localy to the specified path. Example: -lu /path/to/dir')
     parser.add_argument('-uf', action='store_true', help='Update Fingerprint')
-
+    parser.add_argument('-unai', type=str, help='Analyze undetected subdomains using AI. Example: -unai /path/to/undetect.json')
     
     args = parser.parse_args()
 
@@ -428,9 +660,11 @@ def main():
         print("Error: If you use -pf, you must save the scan to local with -o /path/to/save")
         sys.exit(1)
     elif args.sfid:
-        check_fingerprint()
+        check_fingerprint(1)
     elif args.ks:
         kill_server()
+    elif args.unai:
+        analyze_with_gemini(args.unai)
     else:
         scan_by_web(args.mode, args.vo, args.pe, args.lf,  args.o,  args.pf, args.su, args.lu)
 
