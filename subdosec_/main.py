@@ -29,6 +29,44 @@ import threading
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+@contextmanager
+def suppress_stderr():
+    """Suppress stderr output at both Python and C/C++ library levels."""
+    stderr_fd = sys.stderr.fileno()
+    # Save a copy of the original stderr file descriptor
+    with os.fdopen(os.dup(stderr_fd), 'wb') as old_stderr:
+        # Redirect stderr to /dev/null
+        with open(os.devnull, 'wb') as devnull:
+            os.dup2(devnull.fileno(), stderr_fd)
+        try:
+            yield
+        finally:
+            # Restore stderr
+            os.dup2(old_stderr.fileno(), stderr_fd)
+
+# --------------------- LOADING SPINNER -----------------------
+
+class Spinner:
+    def __init__(self, message="Processing..."):
+        self.spinner = itertools.cycle(['|', '/', '-', '\\'])
+        self.stop_running = False
+        self.message = message
+
+    def start(self):
+        def run():
+            while not self.stop_running:
+                sys.stdout.write(f"\r{self.message} {next(self.spinner)}")
+                sys.stdout.flush()
+                time.sleep(0.1)
+            sys.stdout.write("\r" + " " * (len(self.message) + 2) + "\r")
+            sys.stdout.flush()
+
+        self.thread = threading.Thread(target=run)
+        self.thread.start()
+
+    def stop(self):
+        self.stop_running = True
+        self.thread.join()
 
 def is_port_in_use(port):
     """Check if the given port is currently in use on localhost."""
@@ -334,19 +372,34 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
     except Exception as e:
         if pe: print(f"[Error] {target} : {e}")
 
-def check_fingerprint():
+def check_fingerprint(p):
     try:
         _, _, _, host_scan_prod, _ = load_env_vars('public')
         fingerprints = fetch_fingerprints(host_scan_prod, False)
-        
+
+        output = []
+
         for fingerprint in fingerprints['fingerprints']:
             service = fingerprint['service']
             name = fingerprint['name']
             status = "[False Positive]" if fingerprint['status_fingerprint'] == 1 else "[Active]"
-            print(f"{service} | {name} {status}")
+
+            entry = {
+                "service": service,
+                "name": name,
+                "status": status
+            }
+
+            output.append(entry)
+
+            if p == 1:
+                print(f"{service} | {name} {status}")
+
+        return output
 
     except Exception as e:
         print(f"[Error] : {e}")
+        return []
 
 def analyze_with_gemini(data_file):
     try:
@@ -604,7 +657,7 @@ def main():
         print("Error: If you use -pf, you must save the scan to local with -o /path/to/save")
         sys.exit(1)
     elif args.sfid:
-        check_fingerprint()
+        check_fingerprint(1)
     elif args.ks:
         kill_server()
     elif args.unai:
