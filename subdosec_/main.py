@@ -22,8 +22,8 @@ import time
 import itertools
 import psutil
 from urllib.parse import urlparse
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from google import genai
+from google.genai import types
 from contextlib import contextmanager
 import threading
 
@@ -311,7 +311,7 @@ def autos_protocol(target):
         else:
             raise e
 
-def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod, fingerprints, vuln_only, pe, o, su, lu):
+def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod, fingerprints, vuln_only, pe, o, su, lu, current_num=None, total_targets=None, show_progress=False):
     """Analyze a single target and print the results."""
     try:
         target = target if target.startswith(('http://', 'https://')) else 'https://' + target
@@ -328,11 +328,21 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
         for index, fingerprint in enumerate(fingerprints['fingerprints'], start=1):
             in_body_match = fingerprint['rules'].get('in_body', 'subdosec') in response.text
             fingerprint_encoded = base64.b64encode(json.dumps(fingerprint).encode('utf-8')).decode('utf-8')
-            progress = (index / count_finger) * 100  # Calculate percentage progress
-            output_line = f"{target} [{progress:.2f}%]"
+            
+            # Progress display logic
+            prefix = ""
+            if current_num is not None and total_targets is not None:
+                prefix = f"[{current_num}/{total_targets}] "
 
-            sys.stdout.write(f"\r{output_line}")
-            sys.stdout.flush()
+            if show_progress:
+                progress = (index / count_finger) * 100
+                output_line = f"{prefix}{target} [{progress:.2f}%]"
+                sys.stdout.write(f"\r{output_line}")
+                sys.stdout.flush()
+            elif index == 1: # Print once if not showing detailed progress
+                output_line = f"{prefix}{target}"
+                sys.stdout.write(f"\r{output_line}")
+                sys.stdout.flush()
 
             scan_payload = {
                 'target': target,
@@ -438,9 +448,49 @@ def analyze_with_gemini(data_file):
             entry['cname_records'] = entry.get('cname_records') or []
             entry['a_records'] = entry.get('a_records') or []
 
-        prompt = f"""
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        env_file = os.path.join(script_dir, 'config/.env')
+        load_dotenv(dotenv_path=env_file)
+
+        my_api_key = os.getenv('GEMINI_API_KEY')
+
+        # Check if API key is set
+        if not my_api_key or my_api_key.strip() == '':
+            print("[!] Gemini API key not found!")
+            print("[+] Please enter your Gemini API key.")
+            print("[+] You can get your API key from: https://aistudio.google.com/app/apikey\n")
+
+            # Prompt user for API key
+            user_api_key = input("Enter your Gemini API key: ").strip()
+
+            if not user_api_key:
+                print("[Error] No API key provided. Exiting...")
+                return
+
+            # Save the API key to .env file
+            set_key(env_file, 'GEMINI_API_KEY', user_api_key)
+            print(f"[+] API key has been saved to {env_file}\n")
+            my_api_key = user_api_key
+
+        # Configure Gemini Client
+        client = genai.Client(api_key=my_api_key)
+
+        # Batch processing
+        chunk_size = 5
+        results = []
+        total_items = len(cleaned_data)
+        batches = [cleaned_data[i:i + chunk_size] for i in range(0, total_items, chunk_size)]
+        total_batches = len(batches)
+
+        if total_batches > 1:
+            print(f"[INFO] Analyzing {total_items} items in {total_batches} batches.\n")
+        else:
+            print(f"[INFO] Analyzing {total_items} items with Gemini.\n")
+
+        for i, batch in enumerate(batches, 1):
+            prompt = f"""
         cat undetected.json
-        {json.dumps(cleaned_data, indent=4)}
+        {json.dumps(batch, indent=4)}
 
         Based on the CNAME record (clear the CNAME to the root domain as the service name) or A record, please find relevant documents/guides/articles on how to set up a custom domain, and read the guide on how to set up a custom domain on that service.
 
@@ -489,61 +539,68 @@ def analyze_with_gemini(data_file):
         ]
         ```
         """
+            
+            # Start loading spinner
+            spinner_msg = f"Analyzing batch {i}/{total_batches}" if total_batches > 1 else "Analyzing with Gemini"
+            spinner = Spinner(spinner_msg)
+            spinner.start()
 
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        env_file = os.path.join(script_dir, 'config/.env')
-        load_dotenv(dotenv_path=env_file)
+            try:
+                # Run Gemini with STDERR suppressed
+                with suppress_stderr():
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            safety_settings=[
+                                types.SafetySetting(
+                                    category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                                    threshold=types.HarmBlockThreshold.BLOCK_NONE,
+                                ),
+                                types.SafetySetting(
+                                    category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                                    threshold=types.HarmBlockThreshold.BLOCK_NONE,
+                                ),
+                                types.SafetySetting(
+                                    category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                                    threshold=types.HarmBlockThreshold.BLOCK_NONE,
+                                ),
+                                types.SafetySetting(
+                                    category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+                                    threshold=types.HarmBlockThreshold.BLOCK_NONE,
+                                ),
+                            ]
+                        )
+                    )
+                spinner.stop()
 
-        my_api_key = os.getenv('GEMINI_API_KEY')
+                # Extract and append JSON result
+                match = re.search(r"```json\s*(\[\s*{.*?}\s*\])\s*```", response.text, re.DOTALL)
+                if match:
+                    cleaned_json = match.group(1)
+                    batch_results = json.loads(cleaned_json)
+                    results.extend(batch_results)
+                else: 
+                     # Fallback if markdown code block is missing but json is present
+                     try:
+                        batch_results = json.loads(response.text)
+                        if isinstance(batch_results, list):
+                           results.extend(batch_results)
+                     except:
+                        pass 
 
-        # Check if API key is set
-        if not my_api_key or my_api_key.strip() == '':
-            print("[!] Gemini API key not found!")
-            print("[+] Please enter your Gemini API key.")
-            print("[+] You can get your API key from: https://aistudio.google.com/app/apikey\n")
+            except Exception as e:
+                spinner.stop()
+                print(f"[Warning] Batch {i} failed: {e}")
 
-            # Prompt user for API key
-            user_api_key = input("Enter your Gemini API key: ").strip()
+            # Print progress after each batch only if multiple batches
+            if total_batches > 1:
+                print(f"[INFO] Progress: {min(i * chunk_size, total_items)}/{total_items} data analyzed.")
 
-            if not user_api_key:
-                print("[Error] No API key provided. Exiting...")
-                return
 
-            # Save the API key to .env file
-            set_key(env_file, 'GEMINI_API_KEY', user_api_key)
-            print(f"[+] API key has been saved to {env_file}\n")
-            my_api_key = user_api_key
-
-        # Start loading spinner
-        spinner = Spinner("Analyzing with Gemini")
-        spinner.start()
-
-        # Run Gemini with STDERR suppressed (including configuration and model initialization)
-        with suppress_stderr():
-            genai.configure(api_key=my_api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            response = model.generate_content(
-                prompt,
-                safety_settings={
-                    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-                    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-                    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-                    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-                }
-            )
-
-        spinner.stop()
-
-        # Extract and print JSON result
-        try:
-            match = re.search(r"```json\s*(\[\s*{.*?}\s*\])\s*```", response.text, re.DOTALL)
-            if not match:
-                raise ValueError("Could not extract JSON from Gemini response.")
-
-            cleaned_json = match.group(1)
-            results = json.loads(cleaned_json)
-
-            print("NEW POTENTIAL :\n")
+        # Finally, print all results
+        print("\nNEW POTENTIAL :\n")
+        if results:
             for entry in results:
                 cname = entry.get('CNAME', '-')
                 a_record = entry.get('A_RECORD') or []
@@ -557,11 +614,8 @@ def analyze_with_gemini(data_file):
                 print(f"  Reason   : {entry.get('REASON', '-')}")
                 print(f"  Reference: {entry.get('LINK_REFERENCE', '-')}")
                 print("=" * 80)
-
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"[Warning] Failed to parse JSON from response: {e}")
-            print("Raw response:")
-            print(response.text)
+        else:
+            print("No results found.")
 
     except FileNotFoundError:
         print(f"[Error] File not found: {data_file}")
@@ -598,7 +652,7 @@ def read_local_finger(file_path, host_scan_prod):
         print(f"Error: The file at {file_path} is not a valid JSON file. Try using fingerprint form server.")
         return cache_finger
     
-def scan_by_web(mode, vuln_only, pe, lf, o, pf, su, lu):
+def scan_by_web(mode, vuln_only, pe, lf, o, pf, su, lu, show_progress):
     """Main function to perform the web scanning."""
     try:
         apikey, output_scan, host_scan, host_scan_prod, _ = load_env_vars(mode)
@@ -615,10 +669,11 @@ def scan_by_web(mode, vuln_only, pe, lf, o, pf, su, lu):
 
         final_finger = read_local_finger(pf, host_scan_prod) if pf else (lock_filtered_fingerprints if lf != 'all' else filtered_fingerprints)
 
-        targets = [line.strip() for line in sys.stdin]
+        targets = [line.strip() for line in sys.stdin if line.strip()]
+        total_targets = len(targets)
 
-        for target in targets:
-            analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod, final_finger, vuln_only, pe, o, su, lu)
+        for i, target in enumerate(targets, 1):
+            analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod, final_finger, vuln_only, pe, o, su, lu, current_num=i, total_targets=total_targets, show_progress=show_progress)
 
     except ValueError as e:
         print(f"[Configuration Error] {e}")
@@ -626,7 +681,8 @@ def scan_by_web(mode, vuln_only, pe, lf, o, pf, su, lu):
 
 def main():
     """Entry point for the script."""
-    print(f"{pyfiglet.figlet_format('Subdosec')}\n")
+    
+    print(f"{pyfiglet.figlet_format('Subdosec', font='slant')}\n")
     parser = argparse.ArgumentParser(description='Web scanner.')
     parser.add_argument('-mode', choices=['private', 'public'], default='public', help='Mode of operation (private/public)')
     parser.add_argument('-initkey', help='Initialize the API key')
@@ -642,6 +698,7 @@ def main():
     parser.add_argument('-lu', type=str, help='Undetec stored localy to the specified path. Example: -lu /path/to/dir')
     parser.add_argument('-uf', action='store_true', help='Update Fingerprint')
     parser.add_argument('-unai', type=str, help='Analyze undetected subdomains using AI. Example: -unai /path/to/undetect.json')
+    parser.add_argument('-sp', action='store_true', help='Show progress per fingerprint')
 
     
     args = parser.parse_args()
@@ -663,7 +720,7 @@ def main():
     elif args.unai:
         analyze_with_gemini(args.unai)
     else:
-        scan_by_web(args.mode, args.vo, args.pe, args.lf,  args.o,  args.pf, args.su, args.lu)
+        scan_by_web(args.mode, args.vo, args.pe, args.lf,  args.o,  args.pf, args.su, args.lu, args.sp)
 
 if __name__ == "__main__":
     main()
