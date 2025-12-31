@@ -17,7 +17,8 @@ setup(
         'urllib3',
         'aiohttp',
         'pyfiglet',
-        'psutil'
+        'psutil',
+        'google-genai'
     ],
     entry_points={
         'console_scripts': [
