@@ -683,7 +683,7 @@ def main():
     """Entry point for the script."""
     
     print(f"{pyfiglet.figlet_format('Subdosec', font='slant')}\n")
-    parser = argparse.ArgumentParser(description='Web scanner.')
+    parser = argparse.ArgumentParser(description='Subdomain takeover scanner.')
     parser.add_argument('-mode', choices=['private', 'public'], default='public', help='Mode of operation (private/public)')
     parser.add_argument('-initkey', help='Initialize the API key')
     parser.add_argument('-vo', action='store_true', help='VULN Only: Hide UNDETECT messages')
