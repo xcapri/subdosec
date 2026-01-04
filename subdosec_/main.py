@@ -26,6 +26,9 @@ from google import genai
 from google.genai import types
 from contextlib import contextmanager
 import threading
+import concurrent.futures
+
+print_lock = threading.Lock()
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -184,8 +187,7 @@ def load_env_vars(mode):
         signup_url = os.getenv('SIGNUP_URL')
         raise ValueError(f"Create a password & apikey first at {signup_url}.\nThen run `subdosec -initkey your-key`")
     
-    if mode == 'public':
-        print(f"[WARNING] You are not using private mode; results will be public.")
+
     
     return apikey, output_scan, host_scan, host_scan_prod, node_port
 
@@ -311,7 +313,7 @@ def autos_protocol(target):
         else:
             raise e
 
-def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod, fingerprints, vuln_only, pe, o, su, lu, current_num=None, total_targets=None, show_progress=False):
+def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod, fingerprints, vuln_only, pe, o, su, lu, current_num=None, total_targets=None, verbose=False):
     """Analyze a single target and print the results."""
     try:
         target = target if target.startswith(('http://', 'https://')) else 'https://' + target
@@ -329,20 +331,8 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
             in_body_match = fingerprint['rules'].get('in_body', 'subdosec') in response.text
             fingerprint_encoded = base64.b64encode(json.dumps(fingerprint).encode('utf-8')).decode('utf-8')
             
-            # Progress display logic
-            prefix = ""
-            if current_num is not None and total_targets is not None:
-                prefix = f"[{current_num}/{total_targets}] "
+            # Removed per-fingerprint progress display to avoid messy output with threading
 
-            if show_progress:
-                progress = (index / count_finger) * 100
-                output_line = f"{prefix}{target} [{progress:.2f}%]"
-                sys.stdout.write(f"\r{output_line}")
-                sys.stdout.flush()
-            elif index == 1: # Print once if not showing detailed progress
-                output_line = f"{prefix}{target}"
-                sys.stdout.write(f"\r{output_line}")
-                sys.stdout.flush()
 
             scan_payload = {
                 'target': target,
@@ -362,8 +352,13 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
             web_data = next(item.get('website_data') for item in match_response if item.get('isMatched'))
             fingerprint_id = next(item.get('service').get('fid') for item in match_response if item.get('isMatched'))
             
-            msg = f" [{service}] [VULN] [SAVED]" if o else f" [VULN] {output_scan}{service}"
-            print(msg)
+            prefix = ""
+            if verbose and current_num is not None and total_targets is not None:
+                prefix = f"[{current_num}/{total_targets}] "
+
+            msg = f"{prefix}{target} [{service}] [VULN] [SAVED]" if o else f"{prefix}{target} [VULN] {output_scan}{service}"
+            with print_lock:
+                print(msg)
 
             if o:
                 asyncio.run(save_local(web_data, service, fingerprint_id, o))
@@ -372,7 +367,12 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
 
 
         elif not vuln_only:
-            print(" [UNDETECT]")
+            prefix = ""
+            if verbose and current_num is not None and total_targets is not None:
+                prefix = f"[{current_num}/{total_targets}] "
+
+            with print_lock:
+                print(f"{prefix}{target} [UNDETECT]")
             if lu:
                 asyncio.run(undetect_site_localy(match_response[0], lu))
             elif not su:
@@ -380,7 +380,9 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
 
 
     except Exception as e:
-        if pe: print(f"[Error] {target} : {e}")
+        if pe:
+            with print_lock:
+                print(f"[Error] {target} : {e}")
 
 def check_fingerprint(p):
     try:
@@ -652,9 +654,12 @@ def read_local_finger(file_path, host_scan_prod):
         print(f"Error: The file at {file_path} is not a valid JSON file. Try using fingerprint form server.")
         return cache_finger
     
-def scan_by_web(mode, vuln_only, pe, lf, o, pf, su, lu, show_progress):
+def scan_by_web(mode, vuln_only, pe, lf, o, pf, su, lu, verbose, threads=10):
     """Main function to perform the web scanning."""
     try:
+        if mode == 'public' and not (o or su or lu):
+            print(f"[WARNING] You are not using private mode; results will be public.")
+
         apikey, output_scan, host_scan, host_scan_prod, _ = load_env_vars(mode)
         fingerprints = fetch_fingerprints(host_scan_prod, False)
         filtered_fingerprints = {'fingerprints': [fingerprint for fingerprint in fingerprints['fingerprints'] if fingerprint['status_fingerprint'] != 1]} 
@@ -672,8 +677,17 @@ def scan_by_web(mode, vuln_only, pe, lf, o, pf, su, lu, show_progress):
         targets = [line.strip() for line in sys.stdin if line.strip()]
         total_targets = len(targets)
 
-        for i, target in enumerate(targets, 1):
-            analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod, final_finger, vuln_only, pe, o, su, lu, current_num=i, total_targets=total_targets, show_progress=show_progress)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
+            futures = []
+            for i, target in enumerate(targets, 1):
+                futures.append(executor.submit(
+                    analyze_target, target, mode, apikey, output_scan, host_scan, host_scan_prod,
+                    final_finger, vuln_only, pe, o, su, lu, current_num=i, total_targets=total_targets,
+                    verbose=verbose
+                ))
+            
+            # Wait for all futures to complete (optional, context manager handles it too)
+            concurrent.futures.wait(futures)
 
     except ValueError as e:
         print(f"[Configuration Error] {e}")
@@ -698,7 +712,8 @@ def main():
     parser.add_argument('-lu', type=str, help='Undetec stored localy to the specified path. Example: -lu /path/to/dir')
     parser.add_argument('-uf', action='store_true', help='Update Fingerprint')
     parser.add_argument('-unai', type=str, help='Analyze undetected subdomains using AI. Example: -unai /path/to/undetect.json')
-    parser.add_argument('-sp', action='store_true', help='Show progress per fingerprint')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Show progress count (e.g. [1/10])')
+    parser.add_argument('-t', '--threads', type=int, default=10, help='Number of threads to use for scanning (default: 10)')
 
     
     args = parser.parse_args()
@@ -720,7 +735,7 @@ def main():
     elif args.unai:
         analyze_with_gemini(args.unai)
     else:
-        scan_by_web(args.mode, args.vo, args.pe, args.lf,  args.o,  args.pf, args.su, args.lu, args.sp)
+        scan_by_web(args.mode, args.vo, args.pe, args.lf,  args.o,  args.pf, args.su, args.lu, args.verbose, args.threads)
 
 if __name__ == "__main__":
     main()
