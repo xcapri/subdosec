@@ -98,9 +98,16 @@ def kill_server():
             except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
                 print(f"[-] Could not kill process {conn.pid}: {e}")
 
+def get_user_dir():
+    """Get the user-specific directory for configuration and data."""
+    path = os.path.join(os.path.expanduser("~"), ".subdosec")
+    if not os.path.exists(path):
+        os.makedirs(path)
+    return path
+
 def get_node_env_dir():
     """Get the directory for the dedicated Node.js environment."""
-    return os.path.join(os.path.expanduser("~"), ".subdosec", "node_vm")
+    return os.path.join(get_user_dir(), "node_vm")
 
 def install_node_runtime():
     """Install Node.js v18.20.4 to the dedicated directory at runtime."""
@@ -156,7 +163,10 @@ def get_node_paths():
 def run_node_server():
     """Start the Node.js server with auto-healing capabilities."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    env_file = os.path.join(script_dir, 'config/.env')
+    
+    # Use user directory for config
+    user_dir = get_user_dir()
+    env_file = os.path.join(user_dir, '.env')
     
     # Paths
     node_dir = os.path.join(script_dir, 'node')
@@ -285,28 +295,35 @@ def load_env_vars(mode):
 
 def fetch_fingerprints(host_scan_prod, update):
     """Fetch fingerprints from API or load from cache if available (unless update is True)."""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    offline_fingerprint = os.path.join(script_dir, 'config/offinger.json')
+    user_dir = get_user_dir()
+    offline_fingerprint = os.path.join(user_dir, 'offinger.json')
 
     if update or not os.path.exists(offline_fingerprint):
         url = host_scan_prod.replace('/api/scan/cli', '/api/getfinger')
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
+        if '/api/getfinger' not in url:
+             pass
 
-        data = response.json()
+        try:
+             response = requests.get(url, timeout=30)
+             response.raise_for_status()
 
-        os.makedirs(os.path.dirname(offline_fingerprint), exist_ok=True)
-        with open(offline_fingerprint, 'w') as f:
-            json.dump(data, f, indent=2)
+             data = response.json()
 
-        if update:
-            print("Update successful")
-            return
+             with open(offline_fingerprint, 'w') as f:
+                json.dump(data, f, indent=2)
 
-        return data
+             if update:
+                print("Update successful")
+                return
 
-    with open(offline_fingerprint, 'r') as f:
-        return json.load(f)
+             return data
+        except Exception:
+             pass
+
+    if os.path.exists(offline_fingerprint):
+        with open(offline_fingerprint, 'r') as f:
+            return json.load(f)
+    return {'fingerprints': []}
 
 def extract_title(content):
     """Extract the title from the HTML content."""
@@ -544,8 +561,9 @@ def analyze_with_gemini(data_file):
             entry['cname_records'] = entry.get('cname_records') or []
             entry['a_records'] = entry.get('a_records') or []
 
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        env_file = os.path.join(script_dir, 'config/.env')
+        # Use user directory for config
+        user_dir = get_user_dir()
+        env_file = os.path.join(user_dir, '.env')
         load_dotenv(dotenv_path=env_file)
 
         my_api_key = os.getenv('GEMINI_API_KEY')
