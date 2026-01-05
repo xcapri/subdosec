@@ -30,6 +30,7 @@ import concurrent.futures
 import shutil
 
 print_lock = threading.Lock()
+file_lock = threading.Lock()
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -271,21 +272,22 @@ async def undetect_site_localy(siteinfo, path):
 
     file_path = os.path.join(path, "undetect.json")
 
-    if os.path.exists(file_path):
-        with open(file_path, 'r', encoding='utf-8') as f:
-            try:
-                data = json.load(f)
-                if not isinstance(data, list):
+    with file_lock:
+        if os.path.exists(file_path):
+            with open(file_path, 'r', encoding='utf-8') as f:
+                try:
+                    data = json.load(f)
+                    if not isinstance(data, list):
+                        data = []
+                except json.JSONDecodeError:
                     data = []
-            except json.JSONDecodeError:
-                data = []
-    else:
-        data = []
+        else:
+            data = []
 
-    data.append(siteinfo['website_data'])
+        data.append(siteinfo['website_data'])
 
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=4)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4)
 
 
 async def vuln_site(siteinfo, fingerprint_id, apikey, host_scan_prod, mode):
@@ -315,8 +317,9 @@ async def save_local(w, fs, fid, o):
     subdomain = w.get('subdomain', None)
 
     if subdomain:
-        with open(file_path, 'a') as file:
-            file.write(subdomain + '\n')
+        with file_lock:
+            with open(file_path, 'a') as file:
+                file.write(subdomain + '\n')
     else:
         print(f"No subdomain found in data.")
 
