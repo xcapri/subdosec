@@ -282,7 +282,7 @@ def load_env_vars(mode):
         "PUBLIC_API_KEY": "feaf1cc1-1199-4eb5-864d-b4cec1526c71",
         "OUTPUT_SCAN_PRIV": "https://subdosec.vulnshot.com/result/priv/",
         "OUTPUT_SCAN_PUB": "https://subdosec.vulnshot.com/result/pub/",
-        "PROD_SCAN_API_HOST": "https://sscan.vulnshot.com/api/getfinger",
+        "PROD_SCAN_API_HOST": "https://sscan.vulnshot.com/api/scan/cli",
         "SCAN_API_HOST": "http://127.0.0.1:3000/local/scan",
         "PORT": "3000",
         "SIGNUP_URL": "https://subdosec.vulnshot.com/signup"
@@ -417,9 +417,11 @@ async def vuln_site(siteinfo, fingerprint_id, apikey, host_scan_prod, mode):
         'mode': mode,
         'fingerprint_id': fingerprint_id
     }
+    
     async with aiohttp.ClientSession() as session:
         async with session.post(url, headers=headers, json=payload) as response:
-           return await response.json()
+           data = await response.json()
+           return data
 
 async def save_local(w, fs, fid, o):
 
