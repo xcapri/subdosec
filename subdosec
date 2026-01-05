@@ -156,10 +156,10 @@ def get_node_paths():
 def run_node_server():
     """Start the Node.js server with auto-healing capabilities."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    env_file = os.path.join(script_dir, 'config/.env')
+    env_file = os.path.join(script_dir, 'subdosec_/config/.env')
     
     # Paths
-    node_dir = os.path.join(script_dir, 'node')
+    node_dir = os.path.join(script_dir, 'subdosec_/node')
     js_loc = os.path.join(node_dir, 'scan.js') 
     node_modules_dir = os.path.join(node_dir, 'node_modules')
 
@@ -248,7 +248,7 @@ def run_node_server():
 def init_key(apikey):
     """Initialize the API key in the .env file."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    env_file = os.path.join(script_dir, 'config/.env')
+    env_file = os.path.join(script_dir, 'subdosec_/config/.env')
     
     load_dotenv(dotenv_path=env_file)
     set_key(env_file, 'APIKEY', apikey)
@@ -257,7 +257,7 @@ def init_key(apikey):
 def load_env_vars(mode):
     """Load environment variables based on the mode."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    env_file = os.path.join(script_dir, 'config/.env')
+    env_file = os.path.join(script_dir, 'subdosec_/config/.env')
 
     load_dotenv(dotenv_path=env_file)
 
@@ -281,7 +281,7 @@ def load_env_vars(mode):
 def fetch_fingerprints(host_scan_prod, update):
     """Fetch fingerprints from API or load from cache if available (unless update is True)."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    offline_fingerprint = os.path.join(script_dir, 'config/offinger.json')
+    offline_fingerprint = os.path.join(script_dir, 'subdosec_/config/offinger.json')
 
     if update or not os.path.exists(offline_fingerprint):
         url = host_scan_prod.replace('/api/scan/cli', '/api/getfinger')
@@ -540,7 +540,7 @@ def analyze_with_gemini(data_file):
             entry['a_records'] = entry.get('a_records') or []
 
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        env_file = os.path.join(script_dir, 'config/.env')
+        env_file = os.path.join(script_dir, 'subdosec_/config/.env')
         load_dotenv(dotenv_path=env_file)
 
         my_api_key = os.getenv('GEMINI_API_KEY')
