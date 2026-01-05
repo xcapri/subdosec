@@ -845,8 +845,44 @@ def scan_by_web(mode, vuln_only, pe, lf, o, pf, su, lu, verbose, threads=10):
         print(f"[Configuration Error] {e}")
 
 
+def load_json_without_comments(file_path):
+    try:
+        with open(file_path, 'r') as file:
+            lines = file.readlines()
+            content = "\n".join([line for line in lines if not line.strip().startswith('//')])
+            return json.loads(content)
+    except FileNotFoundError:
+        print(f"[Error] File not found: {file_path}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"[Error] JSON Decode Error: {e}")
+        return None
+    except Exception as e:
+        print(f"[Error] Failed to load JSON: {e}")
+        return None
+
+def submit_fingerprint(file_path):
+    data = load_json_without_comments(file_path)
+    if not data:
+        return
+
+    try:
+        _, _, _, host_scan_prod, _ = load_env_vars('public')
+        url = host_scan_prod.replace('/api/scan/cli', '/api/importFingerprint')
+        
+        print(f"[Info] Submitting fingerprint from {file_path} to {url}...")
+        
+        response = requests.post(url, headers={"Content-Type": "application/json"}, json=data, timeout=30)
+        
+        if response.status_code == 200 or response.status_code == 201:
+             print(f"[Success] Fingerprint submitted successfully!")
+        else:
+             print(f"[Error] Failed to submit fingerprint. Status Code: {response.status_code}")
+
+    except Exception as e:
+        print(f"[Error] Submission failed: {e}")
+
 def main():
-    """Entry point for the script."""
     
     print(f"{pyfiglet.figlet_format('Subdosec', font='slant')}\n")
     parser = argparse.ArgumentParser(description='Subdomain takeover scanner.')
@@ -856,6 +892,7 @@ def main():
     parser.add_argument('-pe', action='store_true', help='Print Error: When there are problems detecting your target')
     parser.add_argument('-ins', action='store_true', help='Prepar node & start server')
     parser.add_argument('-pf', type=str,  help='Private Fingerprint: uses your local fingerprint. Example: -pf /path/to/tko.json')
+    parser.add_argument('-subfng', type=str, help='Submit fingerprint: submit local fingerprint to admin. Example: -subfng localfinger.json')
     parser.add_argument('-lf', default='all',  help='Fingerprint lock: to focus on one or multiple fingerprints. (-lf github.io,surge.sh) and leave this arg to scan all fingerprints')
     parser.add_argument('-sfid', action='store_true',  help='To view all available fingerprint ids.')
     parser.add_argument('-ks', action='store_true',  help='To shut down the server node if you want to not use subdosec for a long time.')
@@ -869,6 +906,10 @@ def main():
 
     
     args = parser.parse_args()
+
+    if args.subfng:
+        submit_fingerprint(args.subfng)
+        sys.exit(0)
 
     if args.initkey:
         init_key(args.initkey)
