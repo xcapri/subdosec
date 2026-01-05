@@ -1,2 +1,6 @@
-include subdosec_/config/*
-include subdosec_/node/*
+include requirements.txt
+recursive-include subdosec_ config *
+recursive-include subdosec_ node *
+recursive-include subdosec_ node/node_modules *
+global-exclude *.pyc
+global-exclude __pycache__

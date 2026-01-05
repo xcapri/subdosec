@@ -26,7 +26,7 @@ Install or upgrade subdosec
 pipx install git+https://github.com/xcapri/subdosec.git
 ```
 ```
-pipx upgrade git+https://github.com/xcapri/subdosec.git
+pipx upgrade subdosec
 ```
 
 

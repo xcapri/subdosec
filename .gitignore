@@ -1,4 +1,11 @@
-*.txt
+!requirements.txt
 gassmeteor
 subdosec_/node/node_modules/
 subdosec_/node/package-lock.json
+subdosec.egg-info/
+build/
+dist/
+__pycache__/
+*.pyc
+*.pyo
+subdosec_/config/.env
