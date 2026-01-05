@@ -98,93 +98,148 @@ def kill_server():
             except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
                 print(f"[-] Could not kill process {conn.pid}: {e}")
 
-def get_node_paths():
-    """Find Node.js and npm executables, prioritizing the current environment (e.g., nodeenv)."""
+def get_node_env_dir():
+    """Get the directory for the dedicated Node.js environment."""
+    return os.path.join(os.path.expanduser("~"), ".subdosec", "node_vm")
+
+def install_node_runtime():
+    """Install Node.js v18.20.4 to the dedicated directory at runtime."""
+    env_dir = get_node_env_dir()
+    print(f"[Info] Installing dedicated Node.js v18.20.4 to {env_dir}...")
+    try:
+        import nodeenv
+    except ImportError:
+         print("[Info] Installing nodeenv...")
+         subprocess.check_call([sys.executable, "-m", "pip", "install", "nodeenv"])
     
-    # Check for node/npm in the current Python environment (venv/pipx)
+    os.makedirs(os.path.dirname(env_dir), exist_ok=True)
+    subprocess.check_call([sys.executable, "-m", "nodeenv", "--node=18.20.4", "--prebuilt", "-v", "--force", env_dir])
+    print("[Info] Node.js installed successfully.")
+
+def get_node_paths():
+    """Find Node.js and npm executables, prioritizing the dedicated environment."""
+    
+    # 1. Check dedicated ~/.subdosec/node_vm
+    env_dir = get_node_env_dir()
     if platform.system() == 'Windows':
+        custom_node = os.path.join(env_dir, 'Scripts', 'node.exe')
+        custom_npm = os.path.join(env_dir, 'Scripts', 'npm.cmd')
+        
         venv_node = os.path.join(sys.prefix, 'Scripts', 'node.exe')
         venv_npm = os.path.join(sys.prefix, 'Scripts', 'npm.cmd')
     else:
+        custom_node = os.path.join(env_dir, 'bin', 'node')
+        custom_npm = os.path.join(env_dir, 'bin', 'npm')
+        
         venv_node = os.path.join(sys.prefix, 'bin', 'node')
         venv_npm = os.path.join(sys.prefix, 'bin', 'npm')
 
-    # Use venv paths if they exist, otherwise fallback to system PATH
-    node_exe = venv_node if os.path.exists(venv_node) else shutil.which('node')
-    npm_exe = venv_npm if os.path.exists(venv_npm) else shutil.which('npm')
+    # Selection Priority: Custom > Venv > System
+    if os.path.exists(custom_node):
+        return custom_node, custom_npm
+        
+    if os.path.exists(venv_node) and 'node' in venv_node.lower(): 
+         # Basic check to ensure sys.prefix isn't just system root if not running in venv
+         # Actually sys.prefix in pipx is reliable.
+         return venv_node, venv_npm
+
+    # System Fallback
+    node_exe = shutil.which('node')
+    npm_exe = shutil.which('npm')
     
-    # Handle npm fallback on Windows properly if just 'npm' is found in path
+    # Windows npm fallback
     if platform.system() == 'Windows' and npm_exe and not npm_exe.endswith('.cmd') and not npm_exe.endswith('.exe'):
          npm_exe = shutil.which('npm.cmd') or npm_exe
 
     return node_exe, npm_exe
 
 def run_node_server():
-    """Initialize the API key in the .env file."""
+    """Start the Node.js server with auto-healing capabilities."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     env_file = os.path.join(script_dir, 'subdosec_/config/.env')
-
-    _, _, _, host_scan_prod, node_port = load_env_vars('public')
-
-    ## Stored Fingerprint To Local
-    fetch_fingerprints(host_scan_prod, False)
     
-    """Start the Node.js server in the background, supporting both Windows and Linux, without displaying output, and then terminate the Python script."""
+    # Paths
     node_dir = os.path.join(script_dir, 'subdosec_/node')
     js_loc = os.path.join(node_dir, 'scan.js') 
     node_modules_dir = os.path.join(node_dir, 'node_modules')
 
+    # 1. Load Configuration
+    _, _, _, host_scan_prod, node_port = load_env_vars('public')
+    fetch_fingerprints(host_scan_prod, False)
+
+    # 2. Ensure Node.js Environment
     node_exe, npm_exe = get_node_paths()
+    
+    if not node_exe:
+         print("[Warning] Node.js executable not found. Attempting auto-install...")
+         try:
+             install_node_runtime()
+             node_exe, npm_exe = get_node_paths()
+         except Exception as e:
+             print(f"[Error] Failed to install Node.js automatically: {e}")
+             sys.exit(1)
 
     if not node_exe:
-         print("[Error] Node.js executable not found. Please install Node.js.")
+         print("[Error] Node.js executable missing. Please install Node.js manually.")
          sys.exit(1)
-    if not npm_exe:
-         print("[Warning] npm executable not found. Modules might not install.")
-         npm_exe = 'npm' # Last resort attempt
+         
+    npm_exe = npm_exe or 'npm'
 
-    try:
-        if os.path.exists(node_dir):
-            os.chdir(node_dir)
-        else:
-            raise FileNotFoundError(f"Node directory not found: {node_dir}")
+    # 3. Ensure Node Modules
+    if os.path.exists(node_dir):
+        os.chdir(node_dir)
+    else:
+        print(f"[Error] Node directory not found: {node_dir}")
+        sys.exit(1)
 
-        if not os.path.exists(node_modules_dir):
-            print(f"Installing Node.js modules using {npm_exe}...")
+    if not os.path.exists(node_modules_dir):
+        print(f"[Info] Installing Node.js modules using {npm_exe}...")
+        try:
             subprocess.run([npm_exe, 'i'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-            print("Node.js modules installed.")
+            print("[Info] Node.js modules installed.")
+        except subprocess.CalledProcessError:
+            print("[Error] Failed to install Node.js modules.")
+            sys.exit(1)
 
-            if is_port_in_use(int(node_port)):
-                print(f"[Info] Port {node_port} is already in use. Server may already be running.")
-                random_port_unused = get_random_unused_port()
-                set_key(env_file, 'PORT', str(random_port_unused))
-                print(f"[Info] Switching to available port: {random_port_unused}")
-                load_dotenv(dotenv_path=env_file, override=True)
-                node_port = os.getenv('PORT')
+    # 4. Port Management (Check & Rotate if needed)
+    if is_port_in_use(int(node_port)):
+        print(f"[Info] Port {node_port} is busy. Finding available port...")
+        random_port = get_random_unused_port()
+        set_key(env_file, 'PORT', str(random_port))
+        print(f"[Info] Switched configuration to port: {random_port}")
+        # Reload env to pick up the new port for this session
+        os.environ["PORT"] = str(random_port) 
+        node_port = str(random_port)
 
-        print(f"Starting Node.js server using {node_exe}...")
-        env = os.environ.copy()
-        env["PORT"] = node_port
-        # Launch the Node.js server with the updated environment
+    # 5. Start Server
+    print(f"[Info] Starting Node.js server using {node_exe} on port {node_port}...")
+    env = os.environ.copy()
+    env["PORT"] = node_port
+    
+    try:
         process = subprocess.Popen([node_exe, js_loc], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+        
+        # 6. Verify Startup
+        for _ in range(30):
+            # Check if process crashed immediately
+            if process.poll() is not None:
+                print(f"[Error] Node.js server process exited unexpectedly with code {process.returncode}.")
+                sys.exit(1)
 
-        for _ in range(30): 
+            # Check if port is listening (success)
             if is_port_in_use(int(node_port)):
-                print("Node.js server started (running in background).")
+                print(f"[Success] Node.js server running in background (PID: {process.pid}).")
                 sys.exit(0)
+                
             time.sleep(1)
 
-        print("Node.js server did not respond within the expected time.")
+        print("[Error] Node.js server timed out waiting for port bind.")
+        if process.poll() is None:
+            process.terminate()
         sys.exit(1)
 
-    except FileNotFoundError as fnf_error:
-        print(f"[Error] {fnf_error}")
-        sys.exit(1)
-    except subprocess.CalledProcessError as cpe_error:
-        print(f"[Error] Failed to install Node.js modules: {cpe_error}")
-        sys.exit(1)
     except Exception as e:
-        print(f"[Error] An unexpected error occurred while starting the Node.js server: {e}")
+        print(f"[Error] Failed to start Node.js server: {e}")
         sys.exit(1)
 
 
