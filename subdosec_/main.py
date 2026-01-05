@@ -262,36 +262,53 @@ def run_node_server():
 
 def init_key(apikey):
     """Initialize the API key in the .env file."""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    env_file = os.path.join(script_dir, 'config/.env')
+    user_dir = get_user_dir()
+    env_file = os.path.join(user_dir, '.env')
     
+    # Create empty .env if not exists
+    if not os.path.exists(env_file):
+        open(env_file, 'a').close()
+
     load_dotenv(dotenv_path=env_file)
     set_key(env_file, 'APIKEY', apikey)
     print(f"API key has been written to {env_file}")
 
 def load_env_vars(mode):
     """Load environment variables based on the mode."""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    env_file = os.path.join(script_dir, 'config/.env')
+    user_dir = get_user_dir()
+    env_file = os.path.join(user_dir, '.env')
+    
+    # Ensure .env exists with defaults if missing
+    if not os.path.exists(env_file):
+        with open(env_file, 'w') as f:
+            f.write("PUBLIC_API_KEY=free\n")
+            f.write("OUTPUT_SCAN_PRIV=\n")
+            f.write("OUTPUT_SCAN_PUB=\n")
+            f.write("SCAN_API_HOST=http://localhost:3000/api/scan/cli\n")
+            f.write("PROD_SCAN_API_HOST=https://subdosec.vulnshot.com/api/getfinger\n")
+            f.write("PORT=3000\n")
+            f.write("SIGNUP_URL=https://subdosec.vulnshot.com/\n")
 
     load_dotenv(dotenv_path=env_file)
 
     apikey = os.getenv('APIKEY') if mode == 'private' else os.getenv('PUBLIC_API_KEY')
     output_scan = os.getenv('OUTPUT_SCAN_PRIV') if mode == 'private' else os.getenv('OUTPUT_SCAN_PUB')
-    host_scan = os.getenv('SCAN_API_HOST').replace('3000', os.getenv('PORT'))
-    host_scan_prod = os.getenv('PROD_SCAN_API_HOST')
-    node_port = os.getenv('PORT') 
+    
+    scan_host_env = os.getenv('SCAN_API_HOST', 'http://localhost:3000/api/scan/cli')
+    port_env = os.getenv('PORT', '3000')
+    
+    host_scan = scan_host_env.replace('3000', port_env)
+    host_scan_prod = os.getenv('PROD_SCAN_API_HOST', 'https://subdosec.vulnshot.com/api/getfinger')
+    node_port = port_env 
 
     if not all([host_scan, output_scan]):
         raise ValueError("Missing required environment variables.")
     
     if mode == 'private' and not apikey:
-        signup_url = os.getenv('SIGNUP_URL')
+        signup_url = os.getenv('SIGNUP_URL', 'https://subdosec.vulnshot.com/')
         raise ValueError(f"Create a password & apikey first at {signup_url}.\nThen run `subdosec -initkey your-key`")
     
-
-    
-    return apikey, output_scan, host_scan, host_scan_prod, node_port
+    return apikey, output_scan or "", host_scan, host_scan_prod, node_port
 
 def fetch_fingerprints(host_scan_prod, update):
     """Fetch fingerprints from API or load from cache if available (unless update is True)."""
