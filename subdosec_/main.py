@@ -195,8 +195,13 @@ def run_node_server():
     if not os.path.exists(node_modules_dir):
         print(f"[Info] Installing Node.js modules using {npm_exe}...")
         try:
+            # Add node executable path to PATH enviroment variable for npm
+            env = os.environ.copy()
+            node_bin_dir = os.path.dirname(node_exe)
+            env["PATH"] = f"{node_bin_dir}{os.pathsep}{env.get('PATH', '')}"
+
             # Capture output to display only on error
-            subprocess.run([npm_exe, 'i'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True)
+            subprocess.run([npm_exe, 'i'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True, env=env)
             print("[Info] Node.js modules installed.")
         except subprocess.CalledProcessError as e:
             print(f"[Error] Failed to install Node.js modules.")
