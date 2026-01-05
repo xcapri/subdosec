@@ -195,10 +195,12 @@ def run_node_server():
     if not os.path.exists(node_modules_dir):
         print(f"[Info] Installing Node.js modules using {npm_exe}...")
         try:
-            subprocess.run([npm_exe, 'i'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+            # Capture output to display only on error
+            subprocess.run([npm_exe, 'i'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True)
             print("[Info] Node.js modules installed.")
-        except subprocess.CalledProcessError:
-            print("[Error] Failed to install Node.js modules.")
+        except subprocess.CalledProcessError as e:
+            print(f"[Error] Failed to install Node.js modules.")
+            print(f"Details:\n{e.stderr}\n{e.stdout}")
             sys.exit(1)
 
     # 4. Port Management (Check & Rotate if needed)
