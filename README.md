@@ -21,18 +21,12 @@ Subdosec is not just a fast and accurate subdomain takeover scanner with no fals
 
 # Installation
 
-Requiretment :
-To install, ensure that Node.js is already installed on your machine.
+Install or upgrade subdosec
 ```
-node -v
-v18.+++
+pipx install git+https://github.com/xcapri/subdosec.git
 ```
-
-And then simply run the following command:
 ```
-python3 -m pip install git+https://github.com/xcapri/subdosec.git --break-system-packages
-or this if you want upgrade :
-python3 -m pip install --upgrade git+https://github.com/xcapri/subdosec.git --break-system-packages
+pipx upgrade git+https://github.com/xcapri/subdosec.git
 ```
 
 
@@ -66,17 +60,18 @@ You can find interesting info.
 
 ```
 $ subdosec -h
- ____        _         _
-/ ___| _   _| |__   __| | ___  ___  ___  ___
-\___ \| | | | '_ \ / _` |/ _ \/ __|/ _ \/ __|
- ___) | |_| | |_) | (_| | (_) \__ \  __/ (__
-|____/ \__,_|_.__/ \__,_|\___/|___/\___|\___|
+   _____       __        __
+  / ___/__  __/ /_  ____/ /___  ________  _____
+  \__ \/ / / / __ \/ __  / __ \/ ___/ _ \/ ___/
+ ___/ / /_/ / /_/ / /_/ / /_/ (__  )  __/ /__
+/____/\__,_/_.___/\__,_/\____/____/\___/\___/
 
 
 
-usage: main.py [-h] [-mode {private,public}] [-initkey INITKEY] [-vo] [-pe] [-ins] [-lf LF] [-sfid]
+usage: main.py [-h] [-mode {private,public}] [-initkey INITKEY] [-vo] [-pe] [-ins] [-pf PF] [-lf LF] [-sfid] [-ks] [-o O] [-su] [-lu LU]
+               [-uf] [-unai UNAI] [-v] [-t THREADS]
 
-Web scanner.
+Subdomain takeover scanner.
 
 options:
   -h, --help            show this help message and exit
@@ -86,15 +81,19 @@ options:
   -vo                   VULN Only: Hide UNDETECT messages
   -pe                   Print Error: When there are problems detecting your target
   -ins                  Prepar node & start server
-  -lf LF                Fingerprint lock: to focus on one or multiple fingerprints. (-lf github.io,surge.sh) and leave this arg to scan all fingerprints
-  -pf                   Private Fingerprint: uses your local fingerprint. Example: -pf /path/to/tko.json
-  -sfid                 To view all available fingerprint ids
-  -o                    Save result locally to the specified path. Example: -o /path/to/dir
+  -pf PF                Private Fingerprint: uses your local fingerprint. Example: -pf /path/to/tko.json
+  -lf LF                Fingerprint lock: to focus on one or multiple fingerprints. (-lf github.io,surge.sh) and leave this arg to scan
+                        all fingerprints
+  -sfid                 To view all available fingerprint ids.
+  -ks                   To shut down the server node if you want to not use subdosec for a long time.
+  -o O                  Save result locally to the specified path. Example: -o /path/to/dir
   -su                   Skip undetect will not stored to server (https://subdosec.vulnshot.com/result/undetected)
-  -lu                   Undetec stored localy to the specified path. Example: -lu /path/to/dir
-  -ks                   To shut down the server node if you want to not use subdosec for a long time
-  -uf                   To update fingerprint in localfingerprint
-
+  -lu LU                Undetec stored localy to the specified path. Example: -lu /path/to/dir
+  -uf                   Update Fingerprint
+  -unai UNAI            Analyze undetected subdomains using AI. Example: -unai /path/to/undetect.json
+  -v, --verbose         Show progress count (e.g. [1/10])
+  -t THREADS, --threads THREADS
+                        Number of threads to use for scanning (default: 10)
 ```
 
 ## Recomend command (no signup required & not saved to server )
