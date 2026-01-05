@@ -870,7 +870,7 @@ def submit_fingerprint(file_path):
         _, _, _, host_scan_prod, _ = load_env_vars('public')
         url = host_scan_prod.replace('/api/scan/cli', '/api/importFingerprint')
         
-        print(f"[Info] Submitting fingerprint from {file_path} to {url}...")
+        print(f"[Info] Submitting fingerprint ...")
         
         response = requests.post(url, headers={"Content-Type": "application/json"}, json=data, timeout=30)
         
