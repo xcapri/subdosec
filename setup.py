@@ -8,7 +8,6 @@ import os
 import subprocess
 
 def check_node_installed():
-    """Check if Node.js and npm are installed. If not, try to install them via nodeenv."""
     node = shutil.which('node')
     npm = shutil.which('npm')
     
@@ -19,16 +18,14 @@ def check_node_installed():
         print("!" * 80 + "\n")
         
         try:
-            # Try to install nodeenv if not present
             try:
                 import nodeenv
             except ImportError:
                 print("Installing nodeenv...")
                 subprocess.check_call([sys.executable, "-m", "pip", "install", "nodeenv"])
             
-            # Install Node.js LTS to the current environment
-            print("Installing Node.js (LTS) to the current environment...")
-            subprocess.check_call([sys.executable, "-m", "nodeenv", "--node=lts", "--prebuilt", "-v", "--force", "."])
+            print(f"Installing Node.js (LTS) to {sys.prefix}...")
+            subprocess.check_call([sys.executable, "-m", "nodeenv", "--node=lts", "--prebuilt", "-v", "--force", sys.prefix])
             
             print("\nNode.js installed successfully!")
             
@@ -42,13 +39,11 @@ def check_node_installed():
         print(f"Found npm: {npm}")
 
 class PostInstallCommand(install):
-    """Post-installation for installation mode."""
     def run(self):
         check_node_installed()
         install.run(self)
 
 class PostDevelopCommand(develop):
-    """Post-installation for development mode."""
     def run(self):
         check_node_installed()
         develop.run(self)

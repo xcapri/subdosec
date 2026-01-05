@@ -27,6 +27,7 @@ from google.genai import types
 from contextlib import contextmanager
 import threading
 import concurrent.futures
+import shutil
 
 print_lock = threading.Lock()
 
@@ -96,6 +97,27 @@ def kill_server():
             except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
                 print(f"[-] Could not kill process {conn.pid}: {e}")
 
+def get_node_paths():
+    """Find Node.js and npm executables, prioritizing the current environment (e.g., nodeenv)."""
+    
+    # Check for node/npm in the current Python environment (venv/pipx)
+    if platform.system() == 'Windows':
+        venv_node = os.path.join(sys.prefix, 'Scripts', 'node.exe')
+        venv_npm = os.path.join(sys.prefix, 'Scripts', 'npm.cmd')
+    else:
+        venv_node = os.path.join(sys.prefix, 'bin', 'node')
+        venv_npm = os.path.join(sys.prefix, 'bin', 'npm')
+
+    # Use venv paths if they exist, otherwise fallback to system PATH
+    node_exe = venv_node if os.path.exists(venv_node) else shutil.which('node')
+    npm_exe = venv_npm if os.path.exists(venv_npm) else shutil.which('npm')
+    
+    # Handle npm fallback on Windows properly if just 'npm' is found in path
+    if platform.system() == 'Windows' and npm_exe and not npm_exe.endswith('.cmd') and not npm_exe.endswith('.exe'):
+         npm_exe = shutil.which('npm.cmd') or npm_exe
+
+    return node_exe, npm_exe
+
 def run_node_server():
     """Initialize the API key in the .env file."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -111,7 +133,14 @@ def run_node_server():
     js_loc = os.path.join(node_dir, 'scan.js') 
     node_modules_dir = os.path.join(node_dir, 'node_modules')
 
-    npm_path = 'npm.cmd' if platform.system() == 'Windows' else 'npm'
+    node_exe, npm_exe = get_node_paths()
+
+    if not node_exe:
+         print("[Error] Node.js executable not found. Please install Node.js.")
+         sys.exit(1)
+    if not npm_exe:
+         print("[Warning] npm executable not found. Modules might not install.")
+         npm_exe = 'npm' # Last resort attempt
 
     try:
         if os.path.exists(node_dir):
@@ -120,8 +149,8 @@ def run_node_server():
             raise FileNotFoundError(f"Node directory not found: {node_dir}")
 
         if not os.path.exists(node_modules_dir):
-            print("Installing Node.js modules...")
-            subprocess.run([npm_path, 'i'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+            print(f"Installing Node.js modules using {npm_exe}...")
+            subprocess.run([npm_exe, 'i'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
             print("Node.js modules installed.")
 
             if is_port_in_use(int(node_port)):
@@ -132,11 +161,11 @@ def run_node_server():
                 load_dotenv(dotenv_path=env_file, override=True)
                 node_port = os.getenv('PORT')
 
-        print("Starting Node.js server...")
+        print(f"Starting Node.js server using {node_exe}...")
         env = os.environ.copy()
         env["PORT"] = node_port
         # Launch the Node.js server with the updated environment
-        process = subprocess.Popen(['node', js_loc], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+        process = subprocess.Popen([node_exe, js_loc], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
 
         for _ in range(30): 
             if is_port_in_use(int(node_port)):
