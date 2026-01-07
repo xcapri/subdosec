@@ -79,11 +79,16 @@ def is_port_in_use(port):
         return s.connect_ex(('localhost', port)) == 0
 
 def get_random_unused_port():
-    """Find a random unused port."""
-    while True:
-        port = random.randint(1024, 65535)
-        if not is_port_in_use(port):
-            return port
+    """Get random unused port which decided by the OS"""
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(("127.0.0.1", 0))   # let the OS to pick the port
+    sock.listen(1)
+
+    port = sock.getsockname()[1]
+    sock.close()
+
+    return port
 
 def kill_server():
     _, _, _, _, node_port = load_env_vars('public')
