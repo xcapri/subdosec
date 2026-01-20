@@ -5,6 +5,7 @@ subdosec_/node/package-lock.json
 subdosec.egg-info/
 build/
 dist/
+subdosec_/__pycache__/
 __pycache__/
 *.pyc
 *.pyo

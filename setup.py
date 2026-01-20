@@ -66,7 +66,7 @@ class PostDevelopCommand(develop):
 
 setup(
     name='Subdosec',
-    description='Subdomain takeover scanner',
+    description='Subdomain takeover scanner & reconnaissance tool',
     author='xcapri',
     author_email='N/A',
     url='https://github.com/xcapri/subdosec',
