@@ -12,11 +12,9 @@ from .utils import is_port_in_use, get_random_unused_port
 from .api import fetch_fingerprints
 
 def get_node_env_dir():
-    """Get the directory for the dedicated Node.js environment."""
     return os.path.join(get_user_dir(), "node_vm")
 
 def install_node_runtime():
-    """Install Node.js v18.20.4 to the dedicated directory at runtime."""
     env_dir = get_node_env_dir()
     print(f"[Info] Installing dedicated Node.js v18.20.4 to {env_dir}...")
     try:
@@ -30,8 +28,6 @@ def install_node_runtime():
     print("[Info] Node.js installed successfully.")
 
 def get_node_paths():
-    """Find Node.js and npm executables, prioritizing the dedicated environment."""
-    
     # 1. Check dedicated ~/.subdosec/node_vm
     env_dir = get_node_env_dir()
     if platform.system() == 'Windows':
@@ -69,15 +65,38 @@ def get_node_paths():
 def kill_server():
     _, _, _, _, node_port = load_env_vars('public')
     node_port = int(node_port)
+    killed_any = False
 
-    for conn in psutil.net_connections(kind='inet'):
-        if conn.status == psutil.CONN_LISTEN and conn.laddr.port == node_port:
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            is_scan_js = False
+            cmdline = proc.info.get('cmdline')
+            if cmdline and 'node' in proc.info['name'].lower():
+                if any('scan.js' in arg for arg in cmdline):
+                    is_scan_js = True
+
+            # Check 2: Is it listening on our port?
+            is_listening_port = False
             try:
-                proc = psutil.Process(conn.pid)
-                print(f"[+] Killing process {conn.pid} on port {node_port} ({proc.name()})")
+                if not is_scan_js:
+                    for conn in proc.connections(kind='inet'):
+                        if conn.status == psutil.CONN_LISTEN and conn.laddr.port == node_port:
+                            is_listening_port = True
+                            break
+            except (psutil.AccessDenied, psutil.NoSuchProcess):
+                pass
+            
+            if is_scan_js or is_listening_port:
+                reason = "runing scan.js" if is_scan_js else f"port {node_port}"
+                print(f"[+] Killing process {proc.info['pid']} ({reason})")
                 proc.kill()
-            except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
-                print(f"[-] Could not kill process {conn.pid}: {e}")
+                killed_any = True
+
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    if not killed_any:
+        print(f"[Info] No active server found on port {node_port} or running scan.js.")
 
 def run_node_server():
     """Start the Node.js server with auto-healing capabilities."""
@@ -154,15 +173,12 @@ def run_node_server():
     
     try:
         process = subprocess.Popen([node_exe, js_loc], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
-        
-        # 6. Verify Startup
+
         for _ in range(30):
-            # Check if process crashed immediately
             if process.poll() is not None:
                 print(f"[Error] Node.js server process exited unexpectedly with code {process.returncode}.")
                 sys.exit(1)
 
-            # Check if port is listening (success)
             if is_port_in_use(int(node_port)):
                 print(f"[Success] Node.js server running in background (PID: {process.pid}).")
                 sys.exit(0)
