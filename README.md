@@ -34,12 +34,6 @@ Then run this every time you start a new terminal session (until “server start
 
 ```
 $ subdosec -ins
- ____        _         _
-/ ___| _   _| |__   __| | ___  ___  ___  ___
-\___ \| | | | '_ \ / _` |/ _ \/ __|/ _ \/ __|
- ___) | |_| | |_) | (_| | (_) \__ \  __/ (__
-|____/ \__,_|_.__/ \__,_|\___/|___/\___|\___|
-
 
 Starting Node.js server...
 Node.js server started successfully.
@@ -68,8 +62,7 @@ $ subdosec -h
 
 
 
-usage: main.py [-h] [-mode {private,public}] [-initkey INITKEY] [-vo] [-pe] [-ins] [-pf PF] [-lf LF] [-sfid] [-ks] [-o O] [-su] [-lu LU]
-               [-uf] [-unai UNAI] [-v] [-t THREADS]
+usage: subdosec [-h] [-mode {private,public}] [-initkey INITKEY] [-vo] [-pe] [-ins] [-pf PF] [-subfng SUBFNG] [-lf LF] [-sfid] [-ks] [-o O] [-su] [-lu LU] [-lm] [-uf] [-unai UNAI] [-v] [-t THREADS]
 
 Subdomain takeover scanner.
 
@@ -82,13 +75,14 @@ options:
   -pe                   Print Error: When there are problems detecting your target
   -ins                  Prepar node & start server
   -pf PF                Private Fingerprint: uses your local fingerprint. Example: -pf /path/to/tko.json
-  -lf LF                Fingerprint lock: to focus on one or multiple fingerprints. (-lf github.io,surge.sh) and leave this arg to scan
-                        all fingerprints
+  -subfng SUBFNG        Submit fingerprint: submit local fingerprint to admin. Example: -subfng localfinger.json
+  -lf LF                Fingerprint lock: to focus on one or multiple fingerprints. (-lf github.io,surge.sh) and leave this arg to scan all fingerprints
   -sfid                 To view all available fingerprint ids.
   -ks                   To shut down the server node if you want to not use subdosec for a long time.
   -o O                  Save result locally to the specified path. Example: -o /path/to/dir
   -su                   Skip undetect will not stored to server (https://subdosec.vulnshot.com/result/undetected)
   -lu LU                Undetec stored localy to the specified path. Example: -lu /path/to/dir
+  -lm                   Local Mode: Save vuln and undetect to default inside tools directory (auto -su)
   -uf                   Update Fingerprint
   -unai UNAI            Analyze undetected subdomains using AI. Example: -unai /path/to/undetect.json
   -v, --verbose         Show progress count (e.g. [1/10])
@@ -98,9 +92,11 @@ options:
 
 ## Recomend command (no signup required & not saved to server )
 
-- **Prepare list** (Support without protocol)
+**Prepare list** 
+> Support without protocol
 ```
-└─$ cat list 
+cat list 
+
 https://careers.rotacloud.com
 http://creators.thinkorion.com
 https://docs.polygon-nightfall.technology
@@ -108,99 +104,129 @@ a.anchorsawaytpt.com
 help.oceges.com
 ```
 
-- **Command#1** (Skip stored undetect to server & save localy)
+**CMD 1** 
+> Skip stored undetect to server & save localy
 ```
-└─$ cat list | subdosec -su -o savevuln
+cat test.txt | subdosec -lm
 
-https://careers.rotacloud.com [100.00%] [gohire.io] [VULN] [SAVED]
-http://creators.thinkorion.com [100.00%] [UNDETECT]
-https://a.anchorsawaytpt.com [100.00%] [UNDETECT]
-https://help.oceges.com [100.00%] [UNDETECT]
-```
-OR using root domain 
-```
-cat list
-example.com 
+https://subdosec.vulnshot.com [UNDETECT]
+http://feedback.bazoom.com [sleekplan.com] [VULN] [SAVED]
+http://demodev.destinojet.co [meteor.com] [VULN] [SAVED]
+http://creators.thinkorion.com [UNDETECT]
+https://www.www.savillerow.status.lnt.cl [ohdear.app] [VULN] [SAVED]
+https://careers.rotacloud.com [gohire.io] [VULN] [SAVED]
+https://careers.rotacloud.com [gohire.io] [VULN] [SAVED]
+https://ai.yooture.com [UNDETECT]
+https://help.oceges.com [UNDETECT]
+http://ftp.thiagolima.com [surge.sh] [VULN] [SAVED]
 
-cat list | subfinder -silent | subdosec -su -o savevuln 
-```
 
+VULN DIRECTORY  : /home/alice/.subdosec/vulns
+UNDETECT FILE   : /home/alice/.subdosec/undetect/undetect.json
 ```
-└─$ ls savevuln/
-gohire.io_tko.txt
-
-└─$ cat savevuln/*
+> Read output 
+```
+~$ ls /home/alice/.subdosec/vulns
+gohire.io_tko.txt  meteor.com_tko.txt  ohdear.app_tko.txt  sleekplan.com_tko.txt  surge.sh_tko.txt
+~$ cat /home/alice/.subdosec/vulns/gohire.io_tko.txt
 careers.rotacloud.com
 ```
-- **Command#2** (Forward result to notify)
+> Read undetect & auto analys new potential vuln with -unai
 ```
-└─$ cat list | subdosec -o savevuln -su -vo | notify -silent 
-
-https://careers.rotacloud.com [100.00%] [gohire.io] [VULN] [SAVED]
-
-```
-
-- **Command#3** (Stored undetec to local if you need for reconaise)
-```
-└─$ cat list | subdosec -o savevuln -lu saveundetect
-
-https://careers.rotacloud.com [100.00%] [gohire.io] [VULN] [SAVED]
-http://creators.thinkorion.com [100.00%] [UNDETECT]
-https://a.anchorsawaytpt.com [100.00%] [UNDETECT]
-```
-
-```
-└─$ ls saveundetect/
-undetect.json
-
-└─$ cat saveundetect/undetect.json
+cat /home/alice/.subdosec/undetect/undetect.json
 [
     {
-        "title": "creators.thinkorion.com Reviews on Testimonial.to",
-        "status_code": 301,
-        "redirect_url": "https://creators.thinkorion.com/",
+        "title": "No title found",
+        "status_code": 404,
+        "redirect_url": "No redirects",
         "cname_records": [
-            "cname.testimonial.to"
+            "cname.redacted.com"
         ],
         "a_records": [
-            "216.24.57.4",
-            "216.24.57.252"
+            "76.76.21.98",
+            "76.76.21.241"
         ],
-        "subdomain": "creators.thinkorion.com",
-        "rootdomain": "thinkorion.com"
+        "subdomain": "try.redacted.com",
+        "rootdomain": "redacted.com"
     },
     {
-        "title": "Subscribe to Get the New Feed Me, Lovely Cookbook",
+        "title": "No title found",
         "status_code": 200,
         "redirect_url": "No redirects",
-        "cname_records": null,
-        "a_records": [
-            "3.13.222.255",
-            "3.130.60.26",
-            "3.13.246.91"
+        "cname_records": [
+            "cname.fermat.shop"
         ],
-        "subdomain": "a.anchorsawaytpt.com",
-        "rootdomain": "anchorsawaytpt.com"
+        "a_records": [
+            "216.150.16.129",
+            "216.150.1.129"
+        ],
+        "subdomain": "get.redacted.com",
+        "rootdomain": "redacted.com"
     }
 ]
 ```
-------
-Every subdomain takeover scan will default to the public dashboard https://subdosec.vulnshot.com/scan#vulnlist, so the following commands can be used:
-## Default scan 
-- ``cat list_subdomain | subdosec``, This command will display the UNDETECT & VULN scan output with the output publicly saved to the subdosec web as a database of vulnerable sites.
-- ``cat list_root_domain | subfinder -silent | httpx -silent | subdosec``, you can also scan subdomains from the subfinder results directly.
-- ``cat list_root_domain | subfinder -silent | httpx -silent | subdosec -vo | notify``, You can also add other commands to throw the output to telegram, slack, dc with notify.
-## Private scan 
-You need to create an account here: https://subdosec.vulnshot.com/signup. Simply use your email, and you will be given a Subdosec env file containing your password and API key. Use the API key to initialize the tool with the command:
+```
+subdosec -unai /home/pd/.subdosec/undetect/undetect.json
 
-``subdosec -initkey your-random-key``.
+[INFO] PURE UNDETECTED 0 | Subdomains are not detected as vulnerable even though they have passed the subdosec scan..
 
-You can then use the password to login and view the scan results on the website (this is optional; the CLI output is sufficient). However, the scan results will still be available on the website in private mode, accessible only to logged-in users.
-Final command:
+[INFO] Analyzing 8 items in 2 batches.
 
-```cat list_root_domain | subfinder -silent | httpx -silent | subdosec -mode private```
+[INFO] Progress: 5/8 data analyzed.
 
----
+NEW POTENTIAL :
+
+
+Domain     : try.redacted.com
+  CNAME    : cname.redacted-service.com
+  A Record : 76.76.21.98, 76.76.21.241
+  Takeover : NOT
+  Reason   : The redacted-service custom domain setup guide explicitly states the requirement of adding a TXT record (e.g., 'redacted-service-verification=<your_site_id>') for domain ownership verification. The presence of a TXT record verification step makes it not vulnerable.
+  Reference: https://www.redacted-service.com/blog/how-to-setup-custom-domain/
+================================================================================
+Domain     : get.redacted.com
+  CNAME    : cname.fermat.shop
+  A Record : 216.150.16.129, 216.150.1.129
+  Takeover : POSSIBLE
+  Reason   : The service uses a static CNAME (cname.fermat.shop) for custom domain setup. Publicly available documentation for Fermat's custom domain setup does not clearly specify a requirement for a TXT record or any dynamic verification method for domain ownership. Without such verification, a static CNAME makes the subdomain potentially vulnerable if the corresponding Fermat account is deleted or becomes unlinked.
+  Reference: https://fermat.shop/
+================================================================================
+```
+**CMD 2**
+> Using root domain & pipeline subdomain finder tool like (subfinder, assetfinder, amass, etc)
+
+```
+cat list
+example.com 
+```
+```
+cat list | subfinder -silent | subdosec -lm
+
+https://subdosec.vulnshot.com [UNDETECT]
+http://feedback.bazoom.com [sleekplan.com] [VULN] [SAVED]
+http://demodev.destinojet.co [meteor.com] [VULN] [SAVED]
+http://creators.thinkorion.com [UNDETECT]
+https://www.www.savillerow.status.lnt.cl [ohdear.app] [VULN] [SAVED]
+https://careers.rotacloud.com [gohire.io] [VULN] [SAVED]
+https://careers.rotacloud.com [gohire.io] [VULN] [SAVED]
+https://ai.yooture.com [UNDETECT]
+https://help.oceges.com [UNDETECT]
+http://ftp.thiagolima.com [surge.sh] [VULN] [SAVED]
+
+
+VULN DIRECTORY  : /home/alice/.subdosec/vulns
+UNDETECT FILE   : /home/alice/.subdosec/undetect/undetect.json
+```
+
+**CMD 3** 
+> (Forward result to notify)
+```
+cat list | subdosec -lm -vo | notify -silent 
+
+https://careers.rotacloud.com [100.00%] [gohire.io] [VULN] [SAVED]
+
+```
+
 # Web Based
 
 Knowing the function of the subdosec web, here you can use the https://subdosec.vulnshot.com/result/undetected feature as a reconnaissance, to find out IP, CNAME, TITLE, STATUS CODE, etc. as further information or even to find new takeover subdomains.
@@ -209,13 +235,12 @@ For example, you search for a site that is not detected as vulnerable by subdose
 
 ![Undetec](img/undetec_sample.png)
 
-After that you analyze it turns out that the service is vulnerable to subdomain takeover. then you can send the fingerprint information to us via telgram channel [Subdosec Group](https://t.me/subdosec).
+After that you analyze it turns out that the service is vulnerable to subdomain takeover. then you can send the fingerprint information to us via ``subdosec -subfng``
 
-Or via [New Discussion](https://github.com/xcapri/subdosec/discussions/new?category=ideas)
-
-Dynamically you can use this element for rules ``title, cname, status_code, in_body, a_record, redirect``:
+> Dynamically you can use this element for rules :  ``title, cname, status_code, in_body, a_record, redirect``
 
 ```
+cat newvuln.json
 {
   "name": "Subdomain takeover - GoHire",
   "rules": {
@@ -228,6 +253,12 @@ Dynamically you can use this element for rules ``title, cname, status_code, in_b
   "service": "gohire.io",
   "logo_service": "https://gohire-website.s3.amazonaws.com/img/logos/gh-logo-main.gif"
 }
+
+subdosec -subfng newvuln.json
+
+[Info] Submitting fingerprint ...
+
+Imported fingerprint data successfully
 ```
 
 ---
