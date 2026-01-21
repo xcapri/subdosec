@@ -6,9 +6,9 @@
   <a href="#installation">Install</a> •
   <a href="#running-subdosec">Usage</a> •
   <a href="#web-based">Web Based</a> •
-  <a href="#online-scan">Online scan</a> •
   <a href="#contribution">Contribution</a> •
-  <a href="https://t.me/subdosec">Join Telegram</a>
+  <a href="#online-scan">Online scan</a> •
+  <a href="#acknowledgments">Acknowledgments</a>
 </p>
 
 ---
@@ -17,7 +17,6 @@ Subdosec is not just a fast and accurate subdomain takeover scanner with no fals
 
 ![Demo](img/new_demo.gif)
 
----
 
 # Installation
 
@@ -54,6 +53,11 @@ You can find interesting info.
 
 ```
 $ subdosec -h
+```
+<details>
+  <summary>Expand full help flags</summary>
+
+```yaml
    _____       __        __
   / ___/__  __/ /_  ____/ /___  ________  _____
   \__ \/ / / / __ \/ __  / __ \/ ___/ _ \/ ___/
@@ -89,8 +93,9 @@ options:
   -t THREADS, --threads THREADS
                         Number of threads to use for scanning (default: 10)
 ```
+</details>
 
-## Recomend command (no signup required & not saved to server )
+## Basic Commands
 
 **Prepare list** 
 > Support without protocol
@@ -229,13 +234,18 @@ https://careers.rotacloud.com [100.00%] [gohire.io] [VULN] [SAVED]
 
 # Web Based
 
-Knowing the function of the subdosec web, here you can use the https://subdosec.vulnshot.com/result/undetected feature as a reconnaissance, to find out IP, CNAME, TITLE, STATUS CODE, etc. as further information or even to find new takeover subdomains.
+Knowing the function of the subdosec web, here you can use the https://subdosec.vulnshot.com/result/undetected feature as a reconnaissance, to find out IP, CNAME, TITLE, STATUS CODE, etc. as further information or even to find new takeover subdomains 
+> It has the same function as undetect.json, the difference is that you and other people share it with each other.
 
 For example, you search for a site that is not detected as vulnerable by subdosec with the keyword *404*, and there is information on cname.gohire.io and the title GoHire, which if you search on Google, there is no article information about subdomain takeover on the gohire service.
 
+
 ![Undetec](img/undetec_sample.png)
 
-After that you analyze it turns out that the service is vulnerable to subdomain takeover. then you can send the fingerprint information to us via ``subdosec -subfng``
+# Contribution
+> We greatly appreciate any contributions you make. If you have suggestions, feedback, or wish to contribute further.
+
+After that you analyze it turns out that the service is vulnerable to subdomain takeover (or us ``-unai``). then you can send the fingerprint information to us via ``subdosec -subfng``
 
 > Dynamically you can use this element for rules :  ``title, cname, status_code, in_body, a_record, redirect``
 
@@ -254,6 +264,8 @@ cat newvuln.json
   "logo_service": "https://gohire-website.s3.amazonaws.com/img/logos/gh-logo-main.gif"
 }
 
+```
+```
 subdosec -subfng newvuln.json
 
 [Info] Submitting fingerprint ...
@@ -261,7 +273,6 @@ subdosec -subfng newvuln.json
 Imported fingerprint data successfully
 ```
 
----
 
 ## Online scan
 
@@ -269,11 +280,21 @@ If you are not a person with a security background, maybe a web-dev/programmer a
 
 ![Undetec](img/onlinescan.gif)
 
-# Contribution
-We greatly appreciate any contributions you make. If you have suggestions, feedback, or wish to contribute further, please feel free to join our Telegram group and reach out to us there.
+## Acknowledgments
+
+The predecessor tools that inspired the creation of subdosec tools.
+
+- [can-i-take-over-xyz](https://github.com/EdOverflow/can-i-take-over-xyz)
+- [can-i-take-over-dns](https://github.com/indianajson/can-i-take-over-dns)
+- [SubOver](https://github.com/Ice3man543/SubOver)
+- [subjack](https://github.com/haccer/subjack)
+- [nuclei-templates/http/takeovers](https://github.com/projectdiscovery/nuclei-templates/tree/main/http/takeovers)
+- The bug bounty community for inspiration and feedback.
 
 
+--- 
+<div align="center">
+  
+  <sub>**`subdosec`** is distributed under [**MIT License**](https://github.com/xcapri/subdosec/blob/main/LICENSE.md)</sub>
 
-# Best regards
-[Xcapri](https://github.com/xcapri),
-[Tegalsec](https://github.com/tegal1337)
+</div>

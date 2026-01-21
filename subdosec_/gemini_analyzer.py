@@ -92,6 +92,11 @@ def analyze_with_gemini(data_file):
         cat undetected.json
         {json.dumps(batch, indent=4)}
 
+
+        # Your role
+        Put yourself in the shoes of a bug hunter or security researcher who is searching for articles on “service-name custom domain” or “service-name subdomain takeover.” Then read the articles you find and draw conclusions based on the rules I have provided.
+
+        # Main Rules
         Based on the CNAME record (clear the CNAME to the root domain as the service name) or A record, please find relevant documents/guides/articles on how to set up a custom domain, and read the guide on how to set up a custom domain on that service.
 
         Possible vulnerable and non-vulnerable rules:
@@ -111,9 +116,10 @@ def analyze_with_gemini(data_file):
         * Do not analyze and search for articles if the a/cname service information is contained in the fingerprint in the subdosec. (skip the process and output)
         * Please find & read using latest article or docs.
 
-        Fingerprint subdosec
+        # Already Fingerprint subdosec
         {fingerprints}
 
+        # Output rules
         Then I want output from you only like this:
         * If there are multiple domains on the same service in the data I sent, the output should only be one.
 
