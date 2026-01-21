@@ -1,6 +1,15 @@
 <p align="center">
 <b>Subdosec</b>
 </p>
+<p align="center">
+Subdomain takeover scanner & reconnaissance tool.
+</p>
+
+---
+
+
+
+![Demo](img/final_demo.gif)
 
 <p align="center">
   <a href="#installation">Install</a> •
@@ -13,10 +22,7 @@
 
 ---
 
-Subdosec is not just a fast and accurate subdomain takeover scanner with no false positives. It also provides a complete database containing a list of sites vulnerable to subdomain takeover (public results), as well as detailed non-vuln subdomain metadata information such as IP, CNAME, TITLE, and STATUS CODE, which you can use for reconnaissance to find sites that may be vulnerable to subdomain takeover on new services.
-
-![Demo](img/new_demo.gif)
-
+> Subdosec is a fast and accurate subdomain takeover scanner with no false positives, featuring a public database of vulnerable subdomains and detailed non-vulnerable metadata (IP, CNAME, title, and status code) for reconnaissance.
 
 # Installation
 
@@ -243,11 +249,11 @@ For example, you search for a site that is not detected as vulnerable by subdose
 ![Undetec](img/undetec_sample.png)
 
 # Contribution
-> We greatly appreciate any contributions you make. If you have suggestions, feedback, or wish to contribute further.
 
-After that you analyze it turns out that the service is vulnerable to subdomain takeover (or us ``-unai``). then you can send the fingerprint information to us via ``subdosec -subfng``
+After you find a new subdomain takeover, either manually or automatically (using -unai), you can submit the data to us using the subdosec -subfng command.
 
-> Dynamically you can use this element for rules :  ``title, cname, status_code, in_body, a_record, redirect``
+Dynamically you can use this element for rules :  
+>``title, cname, status_code, in_body, a_record, redirect``
 
 ```
 cat newvuln.json
