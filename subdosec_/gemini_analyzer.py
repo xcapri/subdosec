@@ -113,11 +113,8 @@ def analyze_with_gemini(data_file):
         * For txt records, there is no need to compare them with the data I sent. That is the result. So focus on the indications from the custom domain article you read.
         * The main rule is, if there is a TXT record keyword in the custom domain article, immediately consider it not vulnerable.
         * The data I send is only used to display custom domain articles related to that service.
-        * Do not analyze and search for articles if the a/cname service information is contained in the fingerprint in the subdosec. (skip the process and output)
         * Please find & read using latest article or docs.
 
-        # Already Fingerprint subdosec
-        {fingerprints}
 
         # Output rules
         Then I want output from you only like this:
