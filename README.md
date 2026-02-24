@@ -235,8 +235,52 @@ UNDETECT FILE   : /home/alice/.subdosec/undetect/undetect.json
 cat list | subdosec -lm -vo | notify -silent 
 
 https://careers.rotacloud.com [100.00%] [gohire.io] [VULN] [SAVED]
+```
+
+**CMD 4**
+> Use private fingerprint, this flag will auto merge public + priv fingerprint
+<details>
+  <summary>Expand full help flags</summary>
+
+```yaml
+cat priv8.json
+
+{
+  "fingerprints": [
+    {
+      "fid": 0,
+      "name": "Subdomain takeover - Pagedeck",
+      "rules": {
+        "cname": "cname.pagedeck.com",
+        "status_code": "404",
+"in_body":"This page could not be found."
+      },
+      "status_fingerprint": 0,
+      "reference": "https://docs.pagedeck.com/getting-started/connecting-a-subdomain",
+      "service": "pagedeck.com",
+      "logo_service": "https://i.ytimg.com/vi/DY76Tjf1m-8/maxresdefault.jpg"
+    },
+    add more
+]}
+```
 
 ```
+ echo try.hugsleep.com | subdosec -pf privfinger.json  -o testpriv -lu okgaslu
+   _____       __        __
+  / ___/__  __/ /_  ____/ /___  ________  _____
+  \__ \/ / / / __ \/ __  / __ \/ ___/ _ \/ ___/
+ ___/ / /_/ / /_/ / /_/ / /_/ (__  )  __/ /__
+/____/\__,_/_.___/\__,_/\____/____/\___/\___/
+
+
+
+https://try.hugsleep.com [pagedeck.com] [VULN] [SAVED]
+
+
+VULN DIRECTORY  : /home/pd/tko/testpriv
+UNDETECT FILE   : /home/pd/tko/okgaslu/undetect.json
+```
+</details>
 
 # Web Based
 
