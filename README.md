@@ -35,14 +35,7 @@ pipx upgrade subdosec
 ```
 
 
-Then run this every time you start a new terminal session (until “server started successfully”).
-
-```
-$ subdosec -ins
-
-Starting Node.js server...
-Node.js server started successfully.
-```
+Subdosec automatically detects its setup state, installs any missing dependencies, and boots the matching engine server on your first scan transparently.
 
 ---
 # Running subdosec
@@ -58,7 +51,7 @@ You can find interesting info.
 </b>
 
 ```
-$ subdosec -h
+$ subdosec
 ```
 <details>
   <summary>Expand full help flags</summary>
@@ -71,33 +64,39 @@ $ subdosec -h
 /____/\__,_/_.___/\__,_/\____/____/\___/\___/
 
 
+  Local API    : ON (port 8450)
+  Gemini Key   : SET
+  Fingerprints : CACHED
 
-usage: subdosec [-h] [-mode {private,public}] [-initkey INITKEY] [-vo] [-pe] [-ins] [-pf PF] [-subfng SUBFNG] [-lf LF] [-sfid] [-ks] [-o O] [-su] [-lu LU] [-lm] [-uf] [-unai UNAI] [-v] [-t THREADS]
+  Usage:
+    cat targets.txt | subdosec                  Scan subdomains (public mode)
+    cat targets.txt | subdosec -lm              Scan & save results locally
+    subdosec -sfid                              List available fingerprints
+    subdosec -unai undetect.json               AI analysis of undetected subs
+    subdosec -uf                                Update fingerprints
 
-Subdomain takeover scanner.
+  Scan Options:
+    -mode private|public  Mode of operation (default: public)
+    -vo                 VULN only: hide UNDETECT messages
+    -pe                 Print errors during scan
+    -lf github.io       Lock to specific fingerprints (-lf surge.sh,github.io)
+    -pf /path/to.json   Use private/local fingerprint file
+    -t 20               Set thread count (default: 10)
+    -v                  Show scan progress counter
+    -unai /path/to/undetect.json  AI analysis of undetected subdomains
 
-options:
-  -h, --help            show this help message and exit
-  -mode {private,public}
-                        Mode of operation (private/public)
-  -initkey INITKEY      Initialize the API key
-  -vo                   VULN Only: Hide UNDETECT messages
-  -pe                   Print Error: When there are problems detecting your target
-  -ins                  Prepar node & start server
-  -pf PF                Private Fingerprint: uses your local fingerprint. Example: -pf /path/to/tko.json
-  -subfng SUBFNG        Submit fingerprint: submit local fingerprint to admin. Example: -subfng localfinger.json
-  -lf LF                Fingerprint lock: to focus on one or multiple fingerprints. (-lf github.io,surge.sh) and leave this arg to scan all fingerprints
-  -sfid                 To view all available fingerprint ids.
-  -ks                   To shut down the server node if you want to not use subdosec for a long time.
-  -o O                  Save result locally to the specified path. Example: -o /path/to/dir
-  -su                   Skip undetect will not stored to server (https://subdosec.vulnshot.com/result/undetected)
-  -lu LU                Undetec stored localy to the specified path. Example: -lu /path/to/dir
-  -lm                   Local Mode: Save vuln and undetect to default inside tools directory (auto -su)
-  -uf                   Update Fingerprint
-  -unai UNAI            Analyze undetected subdomains using AI. Example: -unai /path/to/undetect.json
-  -v, --verbose         Show progress count (e.g. [1/10])
-  -t THREADS, --threads THREADS
-                        Number of threads to use for scanning (default: 10)
+  Output Options:
+    -lm                 Local mode: save vulns & undetect locally
+    -o /path/to/dir     Save vuln results to custom path
+    -lu /path/to/dir    Save undetect results to custom path
+    -su                 Skip sending undetect to server
+
+  Config & Tools:
+    -initkey YOUR_KEY    Initialize private API key
+    -subfng finger.json  Submit fingerprint to admin
+    -uf                 Update fingerprints from server
+    -sfid               View all available fingerprint IDs
+    -ks                 Kill background server
 ```
 </details>
 

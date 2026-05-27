@@ -1,0 +1,1 @@
+# Core clean architecture package

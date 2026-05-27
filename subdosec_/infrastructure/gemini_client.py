@@ -1,56 +1,24 @@
 import os
 import json
 import re
-import sys 
+from typing import List, Dict, Any
 from dotenv import set_key, load_dotenv
 from google import genai
 from google.genai import types
 
-from .app_config import get_user_dir, load_env_vars
-from .utils import Spinner, suppress_stderr
-from .api import check_fingerprint
-from .toon_encoder import encode_to_toon
-from . import colors
+from ..core.ports import AIAnalyzer, LocalStorage
+from ..shared import colors
+from ..shared.utils import Spinner, suppress_stderr
+from ..shared.toon_encoder import encode_to_toon
 
-def analyze_with_gemini(data_file):
-    try:
-        # Load original undetect.json
-        with open(data_file, 'r', encoding='utf-8') as f:
-            raw_data = json.load(f)
 
-        # Load fingerprints
-        fingerprints = check_fingerprint(0)
-        fingerprint_services = [fp['service'] for fp in fingerprints]
+class GeminiClient(AIAnalyzer):
+    def __init__(self, storage: LocalStorage):
+        self.storage = storage
 
-        # Clean data: remove entries whose CNAME matches any fingerprint service
-        cleaned_data = []
-        skipped_count = 0
-
-        for entry in raw_data:
-            cnamelist = entry.get('cname_records') or []
-            is_fp = False
-            for cname in cnamelist:
-                if any(cname.endswith(fp_service) for fp_service in fingerprint_services):
-                    is_fp = True
-                    break
-            if not is_fp:
-                cleaned_data.append(entry)
-            else:
-                skipped_count += 1
-
-        print(colors.info(f"PURE UNDETECTED {skipped_count} | Subdomains are not detected as vulnerable even though they have passed the subdosec scan.") + "\n")
-
-        if not cleaned_data:
-            print(colors.info("No new potential subdomains to analyze.") + "\n")
-            return
-
-        # Ensure all entries have lists for cname and a_records
-        for entry in cleaned_data:
-            entry['cname_records'] = entry.get('cname_records') or []
-            entry['a_records'] = entry.get('a_records') or []
-
-        # Use user directory for config
-        user_dir = get_user_dir()
+    def analyze(self, cleaned_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        # Ensure API key is configured
+        user_dir = self.storage.get_user_dir()
         env_file = os.path.join(user_dir, '.env')
         load_dotenv(dotenv_path=env_file)
 
@@ -67,7 +35,7 @@ def analyze_with_gemini(data_file):
 
             if not user_api_key:
                 print(colors.error("No API key provided. Exiting..."))
-                return
+                return []
 
             # Save the API key to .env file
             set_key(env_file, 'GEMINI_API_KEY', user_api_key)
@@ -206,18 +174,4 @@ def analyze_with_gemini(data_file):
             if total_batches > 1:
                 print(colors.info(f"Progress: {min(i * chunk_size, total_items)}/{total_items} data analyzed."))
 
-
-        # Finally, print all results
-        print(colors.ai_header("NEW POTENTIAL :"))
-        if results:
-            for entry in results:
-                print(colors.ai_result_block(entry))
-        else:
-            print(f"{colors.DIM}No results found.{colors.RESET}")
-
-    except FileNotFoundError:
-        print(colors.error(f"File not found: {data_file}"))
-    except json.JSONDecodeError:
-        print(colors.error(f"Invalid JSON format in file: {data_file}"))
-    except Exception as e:
-        print(colors.error(f"An unexpected error occurred: {e}"))
+        return results
