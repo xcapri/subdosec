@@ -9,6 +9,8 @@ from urllib.parse import urlparse
 
 from .app_config import print_lock, load_env_vars
 from .utils import extract_title, autos_protocol
+from .node_manager import ensure_server_running
+from . import colors
 from .api import (
     fetch_fingerprints, 
     undetect_site, 
@@ -61,7 +63,7 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
             if verbose and current_num is not None and total_targets is not None:
                 prefix = f"[{current_num}/{total_targets}] "
 
-            msg = f"{prefix}{target} [{service}] [VULN] [SAVED]" if o else f"{prefix}{target} [VULN] {output_scan}{service}"
+            msg = f"{prefix}{colors.domain(target)} {colors.service_tag(service)} {colors.vuln('')} {colors.saved()}" if o else f"{prefix}{colors.domain(target)} {colors.vuln('')} {colors.link(output_scan + service)}"
             with print_lock:
                 print(msg)
 
@@ -77,7 +79,7 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
                 prefix = f"[{current_num}/{total_targets}] "
 
             with print_lock:
-                print(f"{prefix}{target} [UNDETECT]")
+                print(f"{prefix}{colors.domain(target)} {colors.undetect()}")
             if lu:
                 asyncio.run(undetect_site_localy(match_response[0], lu))
             elif not su:
@@ -87,13 +89,16 @@ def analyze_target(target, mode, apikey, output_scan, host_scan, host_scan_prod,
     except Exception as e:
         if pe:
             with print_lock:
-                print(f"[Error] {target} : {e}")
+                print(colors.error(f"{target} : {e}"))
 
 def scan_by_web(mode, vuln_only, pe, lf, o, pf, su, lu, verbose, threads=10):
     """Main function to perform the web scanning."""
     try:
+        # Auto-start server if not running
+        ensure_server_running()
+
         if mode == 'public' and not (o or su or lu):
-            print(f"[WARNING] You are not using private mode; results will be public.")
+            print(colors.warning("You are not using private mode; results will be public."))
 
         apikey, output_scan, host_scan, host_scan_prod, _ = load_env_vars(mode)
         fingerprints = fetch_fingerprints(host_scan_prod, False)
@@ -126,9 +131,9 @@ def scan_by_web(mode, vuln_only, pe, lf, o, pf, su, lu, verbose, threads=10):
         
         print("\n")
         if o:
-            print(f"VULN DIRECTORY \t: {os.path.abspath(o)}")
+            print(colors.path_label("VULN DIRECTORY ", os.path.abspath(o)))
         if lu:
-            print(f"UNDETECT FILE \t: {os.path.abspath(os.path.join(lu, 'undetect.json'))}")
+            print(colors.path_label("UNDETECT FILE  ", os.path.abspath(os.path.join(lu, 'undetect.json'))))
 
     except ValueError as e:
-        print(f"[Configuration Error] {e}")
+        print(colors.error(f"Configuration: {e}"))

@@ -84,7 +84,8 @@ setup(
         'psutil',
         'google-genai',
         'httpx',
-        'nodeenv'
+        'nodeenv',
+        'toon_format @ git+https://github.com/toon-format/toon-python.git'
     ],
     entry_points={
         'console_scripts': [

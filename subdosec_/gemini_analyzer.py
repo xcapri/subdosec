@@ -9,6 +9,8 @@ from google.genai import types
 from .app_config import get_user_dir, load_env_vars
 from .utils import Spinner, suppress_stderr
 from .api import check_fingerprint
+from .toon_encoder import encode_to_toon
+from . import colors
 
 def analyze_with_gemini(data_file):
     try:
@@ -36,10 +38,10 @@ def analyze_with_gemini(data_file):
             else:
                 skipped_count += 1
 
-        print(f"[INFO] PURE UNDETECTED {skipped_count} | Subdomains are not detected as vulnerable even though they have passed the subdosec scan..\n")
+        print(colors.info(f"PURE UNDETECTED {skipped_count} | Subdomains are not detected as vulnerable even though they have passed the subdosec scan.") + "\n")
 
         if not cleaned_data:
-            print("[INFO] No new potential subdomains to analyze.\n")
+            print(colors.info("No new potential subdomains to analyze.") + "\n")
             return
 
         # Ensure all entries have lists for cname and a_records
@@ -56,20 +58,20 @@ def analyze_with_gemini(data_file):
 
         # Check if API key is set
         if not my_api_key or my_api_key.strip() == '':
-            print("[!] Gemini API key not found!")
-            print("[+] Please enter your Gemini API key.")
-            print("[+] You can get your API key from: https://aistudio.google.com/app/apikey\n")
+            print(colors.error("Gemini API key not found!"))
+            print(f"{colors.GREEN}[+]{colors.RESET} Please enter your Gemini API key.")
+            print(f"{colors.GREEN}[+]{colors.RESET} You can get your API key from: {colors.link('https://aistudio.google.com/app/apikey')}\n")
 
             # Prompt user for API key
             user_api_key = input("Enter your Gemini API key: ").strip()
 
             if not user_api_key:
-                print("[Error] No API key provided. Exiting...")
+                print(colors.error("No API key provided. Exiting..."))
                 return
 
             # Save the API key to .env file
             set_key(env_file, 'GEMINI_API_KEY', user_api_key)
-            print(f"[+] API key has been saved to {env_file}\n")
+            print(colors.success(f"API key has been saved to {env_file}") + "\n")
             my_api_key = user_api_key
 
         # Configure Gemini Client
@@ -83,14 +85,18 @@ def analyze_with_gemini(data_file):
         total_batches = len(batches)
 
         if total_batches > 1:
-            print(f"[INFO] Analyzing {total_items} items in {total_batches} batches.\n")
+            print(colors.info(f"Analyzing {total_items} items in {total_batches} batches.") + "\n")
         else:
-            print(f"[INFO] Analyzing {total_items} items with Gemini.\n")
+            print(colors.info(f"Analyzing {total_items} items with Gemini.") + "\n")
 
         for i, batch in enumerate(batches, 1):
+            toon_data = encode_to_toon(batch)
             prompt = f"""
-        cat undetected.json
-        {json.dumps(batch, indent=4)}
+        cat undetected.toon
+        {toon_data}
+
+        # TOON format note
+        The data above is in TOON (Token-Oriented Object Notation) tabular format. The header [N]{{field1,field2,...}}: declares the array length and field names. Each indented line is one record with comma-separated values in the same field order. Pipe (|) separates items within array fields. Empty values mean null.
 
 
         # Your role
@@ -194,35 +200,24 @@ def analyze_with_gemini(data_file):
 
             except Exception as e:
                 spinner.stop()
-                print(f"[Warning] Batch {i} failed: {e}")
+                print(colors.warning(f"Batch {i} failed: {e}"))
 
             # Print progress after each batch only if multiple batches
             if total_batches > 1:
-                print(f"[INFO] Progress: {min(i * chunk_size, total_items)}/{total_items} data analyzed.")
+                print(colors.info(f"Progress: {min(i * chunk_size, total_items)}/{total_items} data analyzed."))
 
 
         # Finally, print all results
-        print("\nNEW POTENTIAL :\n")
+        print(colors.ai_header("NEW POTENTIAL :"))
         if results:
             for entry in results:
-                cname = entry.get('CNAME', '-')
-                a_record = entry.get('A_RECORD') or []
-                if not isinstance(a_record, list):
-                    a_record = [a_record]
-
-                print(f"Domain     : {entry.get('DOMAIN', '-')}")
-                print(f"  CNAME    : {cname}")
-                print(f"  A Record : {', '.join(a_record)}")
-                print(f"  Takeover : {entry.get('TAKEOVER', '-')}")
-                print(f"  Reason   : {entry.get('REASON', '-')}")
-                print(f"  Reference: {entry.get('LINK_REFERENCE', '-')}")
-                print("=" * 80)
+                print(colors.ai_result_block(entry))
         else:
-            print("No results found.")
+            print(f"{colors.DIM}No results found.{colors.RESET}")
 
     except FileNotFoundError:
-        print(f"[Error] File not found: {data_file}")
+        print(colors.error(f"File not found: {data_file}"))
     except json.JSONDecodeError:
-        print(f"[Error] Invalid JSON format in file: {data_file}")
+        print(colors.error(f"Invalid JSON format in file: {data_file}"))
     except Exception as e:
-        print(f"[Error] An unexpected error occurred: {e}")
+        print(colors.error(f"An unexpected error occurred: {e}"))

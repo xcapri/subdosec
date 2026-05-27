@@ -10,22 +10,23 @@ from dotenv import set_key
 from .app_config import get_user_dir, load_env_vars
 from .utils import is_port_in_use, get_random_unused_port
 from .api import fetch_fingerprints
+from . import colors
 
 def get_node_env_dir():
     return os.path.join(get_user_dir(), "node_vm")
 
 def install_node_runtime():
     env_dir = get_node_env_dir()
-    print(f"[Info] Installing dedicated Node.js v18.20.4 to {env_dir}...")
+    print(colors.info(f"Installing dedicated Node.js v18.20.4 to {env_dir}..."))
     try:
         import nodeenv
     except ImportError:
-         print("[Info] Installing nodeenv...")
+         print(colors.info("Installing nodeenv..."))
          subprocess.check_call([sys.executable, "-m", "pip", "install", "nodeenv"])
     
     os.makedirs(os.path.dirname(env_dir), exist_ok=True)
     subprocess.check_call([sys.executable, "-m", "nodeenv", "--node=18.20.4", "--prebuilt", "-v", "--force", env_dir])
-    print("[Info] Node.js installed successfully.")
+    print(colors.success("Node.js installed successfully."))
 
 def get_node_paths():
     # 1. Check dedicated ~/.subdosec/node_vm
@@ -88,7 +89,7 @@ def kill_server():
             
             if is_scan_js or is_listening_port:
                 reason = "runing scan.js" if is_scan_js else f"port {node_port}"
-                print(f"[+] Killing process {proc.info['pid']} ({reason})")
+                print(colors.info(f"Killing process {proc.info['pid']} ({reason})"))
                 proc.kill()
                 killed_any = True
 
@@ -96,7 +97,7 @@ def kill_server():
             continue
 
     if not killed_any:
-        print(f"[Info] No active server found on port {node_port} or running scan.js.")
+        print(colors.info(f"No active server found on port {node_port} or running scan.js."))
 
 def run_node_server():
     """Start the Node.js server with auto-healing capabilities."""
@@ -119,16 +120,16 @@ def run_node_server():
     node_exe, npm_exe = get_node_paths()
     
     if not node_exe:
-         print("[Warning] Node.js executable not found. Attempting auto-install...")
+         print(colors.warning("Node.js executable not found. Attempting auto-install..."))
          try:
              install_node_runtime()
              node_exe, npm_exe = get_node_paths()
          except Exception as e:
-             print(f"[Error] Failed to install Node.js automatically: {e}")
+             print(colors.error(f"Failed to install Node.js automatically: {e}"))
              sys.exit(1)
 
     if not node_exe:
-         print("[Error] Node.js executable missing. Please install Node.js manually.")
+         print(colors.error("Node.js executable missing. Please install Node.js manually."))
          sys.exit(1)
          
     npm_exe = npm_exe or 'npm'
@@ -137,11 +138,11 @@ def run_node_server():
     if os.path.exists(node_dir):
         os.chdir(node_dir)
     else:
-        print(f"[Error] Node directory not found: {node_dir}")
+        print(colors.error(f"Node directory not found: {node_dir}"))
         sys.exit(1)
 
     if not os.path.exists(node_modules_dir):
-        print(f"[Info] Installing Node.js modules using {npm_exe}...")
+        print(colors.info(f"Installing Node.js modules..."))
         try:
             # Add node executable path to PATH enviroment variable for npm
             env = os.environ.copy()
@@ -150,24 +151,24 @@ def run_node_server():
 
             # Capture output to display only on error
             subprocess.run([npm_exe, 'i'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True, env=env)
-            print("[Info] Node.js modules installed.")
+            print(colors.success("Node.js modules installed."))
         except subprocess.CalledProcessError as e:
-            print(f"[Error] Failed to install Node.js modules.")
-            print(f"Details:\n{e.stderr}\n{e.stdout}")
+            print(colors.error("Failed to install Node.js modules."))
+            print(f"{colors.DIM}Details:\n{e.stderr}\n{e.stdout}{colors.RESET}")
             sys.exit(1)
 
     # 4. Port Management (Check & Rotate if needed)
     if is_port_in_use(int(node_port)):
-        print(f"[Info] Port {node_port} is busy. Finding available port...")
+        print(colors.info(f"Port {node_port} is busy. Finding available port..."))
         random_port = get_random_unused_port()
         set_key(env_file, 'PORT', str(random_port))
-        print(f"[Info] Switched configuration to port: {random_port}")
+        print(colors.info(f"Switched to port: {random_port}"))
         # Reload env to pick up the new port for this session
         os.environ["PORT"] = str(random_port) 
         node_port = str(random_port)
 
     # 5. Start Server
-    print(f"[Info] Starting Node.js server using {node_exe} on port {node_port}...")
+    print(colors.info(f"Starting server on port {node_port}..."))
     env = os.environ.copy()
     env["PORT"] = node_port
     
@@ -176,20 +177,40 @@ def run_node_server():
 
         for _ in range(30):
             if process.poll() is not None:
-                print(f"[Error] Node.js server process exited unexpectedly with code {process.returncode}.")
+                print(colors.error(f"Server process exited unexpectedly (code {process.returncode})."))
                 sys.exit(1)
 
             if is_port_in_use(int(node_port)):
-                print(f"[Success] Node.js server running in background (PID: {process.pid}).")
-                sys.exit(0)
+                print(colors.success(f"Server running (PID: {process.pid}, port {node_port})."))
+                return process
                 
             time.sleep(1)
 
-        print("[Error] Node.js server timed out waiting for port bind.")
+        print(colors.error("Server timed out waiting for port bind."))
         if process.poll() is None:
             process.terminate()
         sys.exit(1)
 
     except Exception as e:
-        print(f"[Error] Failed to start Node.js server: {e}")
+        print(colors.error(f"Failed to start server: {e}"))
+        sys.exit(1)
+
+
+def ensure_server_running():
+    """Auto-detect and auto-start the Node.js server if not already running.
+    
+    Fully transparent — if the server is already running, produces no output.
+    On first run or after -ks, handles the full setup chain silently.
+    """
+    try:
+        _, _, _, _, node_port = load_env_vars('public')
+        
+        # Already running? Do nothing.
+        if is_port_in_use(int(node_port)):
+            return
+        
+        # Not running — start it
+        run_node_server()
+    except Exception as e:
+        print(colors.error(f"Auto-start failed: {e}"))
         sys.exit(1)

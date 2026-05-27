@@ -6,6 +6,7 @@ import aiohttp
 import requests
 from .app_config import get_user_dir, load_env_vars, file_lock
 from .utils import load_json_without_comments
+from . import colors
 
 def fetch_fingerprints(host_scan_prod, update):
     """Fetch fingerprints from API or load from cache if available (unless update is True)."""
@@ -131,12 +132,12 @@ def check_fingerprint(p):
             output.append(entry)
 
             if p == 1:
-                print(f"{service} | {name} {status}")
+                print(colors.fingerprint_line(service, name, status))
 
         return output
 
     except Exception as e:
-        print(f"[Error] : {e}")
+        print(colors.error(str(e)))
         return []
 
 def read_local_finger(file_path, host_scan_prod):
@@ -175,14 +176,14 @@ def submit_fingerprint(file_path):
         _, _, _, host_scan_prod, _ = load_env_vars('public')
         url = host_scan_prod.replace('/api/scan/cli', '/api/importFingerprint')
         
-        print(f"[Info] Submitting fingerprint...")
+        print(colors.info("Submitting fingerprint..."))
                 
         response = requests.post(url, headers={"Content-Type": "application/json"}, json=data, timeout=30)
         
         if response.status_code == 200 or response.status_code == 201:
-             print(f"[Success] Fingerprint submitted successfully!")
+             print(colors.success("Fingerprint submitted successfully!"))
         else:
-             print(f"[Error] Failed to submit fingerprint. Status Code: {response.status_code}")
+             print(colors.error(f"Failed to submit fingerprint. Status Code: {response.status_code}"))
 
     except Exception as e:
-        print(f"[Error] Submission failed: {e}")
+        print(colors.error(f"Submission failed: {e}"))
