@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="description" content="Subdosec — Subdomain Takeover Scanner Results Dashboard"/>
+<title>Subdosec Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/styles.css"/>
+</head>
+<body>
+<div class="container">
+  <header class="header">
+    <div class="brand">
+      <div class="brand-icon">S</div>
+      <h1>Subdo<span>sec</span></h1>
+    </div>
+    <div class="meta">
+      <span class="dot"></span>
+      <span>Dashboard Live</span>
+      <span>&middot;</span>
+      <span id="lastUpdated">Loading&hellip;</span>
+    </div>
+  </header>
+
+  <section class="stats" id="statsSection">
+    <div class="stat-card">
+      <div class="stat-label">Vulnerable Subdomains</div>
+      <div class="stat-value vuln-color" id="statVulns">&mdash;</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Affected Services</div>
+      <div class="stat-value service-color" id="statServices">&mdash;</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Undetected</div>
+      <div class="stat-value undetect-color" id="statUndetect">&mdash;</div>
+    </div>
+  </section>
+
+  <div class="tabs-row">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="vulns" id="tabVulns">
+        Vulnerabilities<span class="badge" id="badgeVulns">0</span>
+      </button>
+      <button class="tab-btn" data-tab="undetect" id="tabUndetect">
+        Undetected<span class="badge" id="badgeUndetect">0</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="search-bar">
+    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" id="searchInput" placeholder="Search subdomains, services, CNAME&hellip;"/>
+    <button class="clear-btn" id="clearSearch" title="Clear search">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+
+  <!-- Vulns panel -->
+  <div class="tab-panel active" id="panelVulns">
+    <div class="table-wrap">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:36px;cursor:default;padding-left:1rem">
+                <input type="checkbox" class="chk" id="vulnAllChk" title="Select all"/>
+              </th>
+              <th data-sort="subdomain">Vuln Subdomain <span class="sort-icon">&#9650;</span></th>
+              <th data-sort="service">Service <span class="sort-icon">&#9650;</span></th>
+              <th style="text-align:right;padding-right:1rem">Action</th>
+            </tr>
+          </thead>
+          <tbody id="vulnBody"></tbody>
+        </table>
+      </div>
+      <div class="pag-row" id="vulnPag"></div>
+    </div>
+  </div>
+
+  <!-- Undetect panel -->
+  <div class="tab-panel" id="panelUndetect">
+    <div class="table-wrap">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:36px;cursor:default;padding-left:1rem">
+                <input type="checkbox" class="chk" id="undAllChk" title="Select all"/>
+              </th>
+              <th data-sort="subdomain">Subdomain <span class="sort-icon">&#9650;</span></th>
+              <th data-sort="rootdomain">Root Domain <span class="sort-icon">&#9650;</span></th>
+              <th data-sort="potential">Potential <span class="sort-icon">&#9650;</span></th>
+              <th data-sort="title">Title <span class="sort-icon">&#9650;</span></th>
+              <th data-sort="status_code">Status <span class="sort-icon">&#9650;</span></th>
+              <th>CNAME</th>
+              <th>A Records</th>
+              <th data-sort="redirect_url">Redirect <span class="sort-icon">&#9650;</span></th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody id="undetectBody"></tbody>
+        </table>
+      </div>
+      <div class="pag-row" id="undPag"></div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <span>Subdosec Dashboard &middot; Data from <code style="color:var(--cyan)">~/.subdosec/</code></span>
+    <span id="refreshHint">Auto-refresh in 30s</span>
+  </footer>
+</div>
+
+<!-- Floating selection toolbar -->
+<div class="sel-toolbar" id="selToolbar">
+  <span><span class="sel-count" id="selCount">0</span> selected</span>
+  <div class="sep"></div>
+  <button class="toolbar-btn" id="btnClearSel" title="Clear selection">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    Clear
+  </button>
+  <button class="toolbar-btn primary" id="btnExport" title="Export selected data">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export
+  </button>
+</div>
+
+<!-- Export modal -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export Data
+      </h2>
+      <button class="modal-close" id="modalClose" title="Close">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="export-section">
+        <div class="export-summary">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <span>Exporting <span class="num" id="exportCount">0</span> items from <span class="num" id="exportTab">&mdash;</span> tab</span>
+        </div>
+      </div>
+      <div class="export-section">
+        <div class="export-section-title">Export Format</div>
+        <div class="format-grid">
+          <button class="format-option active" data-format="json">
+            <span class="fmt-icon">{&thinsp;}</span>
+            <span class="fmt-label">JSON</span>
+            <span class="fmt-desc">Structured data</span>
+          </button>
+          <button class="format-option" data-format="csv">
+            <span class="fmt-icon">,</span>
+            <span class="fmt-label">CSV</span>
+            <span class="fmt-desc">Spreadsheet ready</span>
+          </button>
+          <button class="format-option" data-format="txt">
+            <span class="fmt-icon">Aa</span>
+            <span class="fmt-label">TXT</span>
+            <span class="fmt-desc">Plain list</span>
+          </button>
+        </div>
+      </div>
+      <div class="export-section">
+        <div class="export-section-title">Include Fields</div>
+        <div class="field-select-all" id="fieldSelectAll">
+          <input type="checkbox" class="chk" id="fieldAllChk" checked/>
+          <label for="fieldAllChk" style="cursor:pointer;font-size:.8rem">Toggle all fields</label>
+        </div>
+        <div class="field-grid" id="fieldGrid"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="toolbar-btn" id="btnCancelExport">Cancel</button>
+      <button class="toolbar-btn primary" id="btnDoExport">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

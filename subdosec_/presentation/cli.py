@@ -16,6 +16,8 @@ from ..infrastructure.node_server import NodeServerManager
 from ..infrastructure.api_client import ApiClient
 from ..infrastructure.gemini_client import GeminiClient
 
+from .web_dashboard import WebDashboard
+
 
 class CliApp:
     def __init__(self):
@@ -93,6 +95,9 @@ class CliApp:
     {colors.GREEN}-uf{colors.RESET}                 {colors.DIM}Update fingerprints from server{colors.RESET}
     {colors.GREEN}-sfid{colors.RESET}               {colors.DIM}View all available fingerprint IDs{colors.RESET}
     {colors.GREEN}-ks{colors.RESET}                 {colors.DIM}Kill background server{colors.RESET}
+
+  {colors.WHITE}{colors.BOLD}Dashboard:{colors.RESET}
+    {colors.GREEN}-web{colors.RESET} {colors.WHITE}[PORT]{colors.RESET}          {colors.DIM}Launch web dashboard (default port: 8443){colors.RESET}
 """)
 
     def run(self) -> None:
@@ -114,12 +119,13 @@ class CliApp:
         parser.add_argument('-lm', action='store_true', help='Local Mode: Save vuln and undetect to default inside tools directory')
         parser.add_argument('-uf', action='store_true', help='Update Fingerprint')
         parser.add_argument('-unai', type=str, help='Analyze undetected subdomains using AI. Example: -unai /path/to/undetect.json')
+        parser.add_argument('-web', nargs='?', const=8443, type=int, metavar='PORT', help='Launch web dashboard (default port: 8443)')
         parser.add_argument('-v', '--verbose', action='store_true', help='Show progress count (e.g. [1/10])')
         parser.add_argument('-t', '--threads', type=int, default=10, help='Number of threads to use for scanning (default: 10)')
 
         args = parser.parse_args()
 
-        has_action = any([args.help, args.initkey, args.uf, args.pf, args.sfid, args.ks, args.unai, args.subfng])
+        has_action = any([args.help, args.initkey, args.uf, args.pf, args.sfid, args.ks, args.unai, args.subfng, args.web is not None])
         has_stdin = not sys.stdin.isatty()
 
         if args.help or (not has_action and not has_stdin):
@@ -170,6 +176,10 @@ class CliApp:
         elif args.unai:
             _, _, _, host_scan_prod, _ = self.storage.load_env_vars('public')
             self.gemini_use_case.execute(args.unai, host_scan_prod)
+        elif args.web is not None:
+            user_dir = self.storage.get_user_dir()
+            dashboard = WebDashboard(user_dir)
+            dashboard.start(port=args.web)
         else:
             targets = [line.strip() for line in sys.stdin if line.strip()]
             self.scan_use_case.execute(config, targets)
