@@ -97,6 +97,9 @@ $ subdosec
     -uf                 Update fingerprints from server
     -sfid               View all available fingerprint IDs
     -ks                 Kill background server
+
+  Dashboard:
+    -web [PORT]          Launch web dashboard (default port: 8443)
 ```
 </details>
 
@@ -280,6 +283,14 @@ VULN DIRECTORY  : /home/pd/tko/testpriv
 UNDETECT FILE   : /home/pd/tko/okgaslu/undetect.json
 ```
 </details>
+
+**CMD 5**
+> Launch the local web dashboard to inspect, search, filter, and export results
+```
+subdosec -web
+# Or specify a custom port:
+subdosec -web 9000
+```
 
 # Web Based
 
