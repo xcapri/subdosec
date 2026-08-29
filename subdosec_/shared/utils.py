@@ -13,7 +13,9 @@ from contextlib import contextmanager
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --------------------- LOADING SPINNER -----------------------
+# Global Locks
+print_lock = threading.Lock()
+file_lock = threading.Lock()
 
 class Spinner:
     def __init__(self, message="Processing..."):

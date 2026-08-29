@@ -71,7 +71,13 @@ setup(
     author_email='N/A',
     url='https://github.com/xcapri/subdosec',
     version='1.0',
-    package_data={"subdosec_": ["config/*", "node/*", "node/**/*"]},
+    package_data={
+        "subdosec_": [
+            "config/*",
+            "node/*",
+            "presentation/web_dashboard/static/*",
+        ]
+    },
     include_package_data=True,
     packages=find_packages(),
     install_requires=[

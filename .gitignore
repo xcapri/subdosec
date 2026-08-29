@@ -2,11 +2,13 @@
 gassmeteor
 subdosec_/node/node_modules/
 subdosec_/node/package-lock.json
-subdosec.egg-info/
+*.egg-info/
+Subdosec-*/
 build/
 dist/
 subdosec_/__pycache__/
 __pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 subdosec_/config/.env
