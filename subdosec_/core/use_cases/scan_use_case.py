@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 
 from ..entities import ScanConfig, Fingerprint
 from ..ports import FingerprintRepository, ServerManager, ScanClient, LocalStorage
+from ..progress import ProgressTracker
 from ...shared import colors
 from ...shared.utils import print_lock, extract_title, autos_protocol
 
@@ -59,6 +60,47 @@ class ScanUseCase:
             else:
                 final_finger = filtered_fingerprints
 
+            # ── Progress / Resume ────────────────────────────────────
+            progress_dir = os.path.join(self.storage.get_user_dir(), "progress")
+            tracker = ProgressTracker(progress_dir)
+
+            if config.resume and tracker.has_pending_session():
+                remaining = tracker.load_remaining_targets()
+                if remaining is None:
+                    print(colors.error("Failed to read previous session. Starting fresh scan."))
+                    tracker.discard_session()
+                elif len(remaining) == 0:
+                    print(colors.info("Previous session already completed. Nothing to resume."))
+                    tracker.finish_session()
+                    return
+                else:
+                    session_cfg = tracker.load_session_config()
+                    total_original = (session_cfg or {}).get("_total_original", len(remaining))
+                    skipped = total_original - len(remaining)
+
+                    targets = remaining
+                    print(colors.info(f"Resuming session — {skipped} already done, {len(targets)} remaining."))
+                    tracker.resume_session()
+            elif config.resume and not tracker.has_pending_session():
+                print(colors.warning("No interrupted session found. Nothing to resume."))
+                return
+            else:
+                # Discard stale session (if any) and start fresh
+                if tracker.has_pending_session():
+                    tracker.discard_session()
+
+                if not targets:
+                    return
+
+                config_snapshot = {
+                    "mode": config.mode,
+                    "output_dir": config.output_dir,
+                    "local_undetect_dir": config.local_undetect_dir,
+                    "_total_original": len(targets),
+                }
+                tracker.start_session(targets, config_snapshot)
+
+            # ── Scan ─────────────────────────────────────────────────
             total_targets = len(targets)
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=config.thread_count) as executor:
@@ -74,10 +116,14 @@ class ScanUseCase:
                         host_scan_prod=host_scan_prod,
                         fingerprints=final_finger,
                         current_num=i,
-                        total_targets=total_targets
+                        total_targets=total_targets,
+                        tracker=tracker
                     ))
                 
                 concurrent.futures.wait(futures)
+
+            # ── Cleanup ──────────────────────────────────────────────
+            tracker.finish_session()
 
             print("\n")
             if config.output_dir:
@@ -98,7 +144,8 @@ class ScanUseCase:
         host_scan_prod: str,
         fingerprints: Dict[str, Any],
         current_num: int,
-        total_targets: int
+        total_targets: int,
+        tracker: ProgressTracker
     ) -> None:
         try:
             orig_target = target
@@ -106,6 +153,7 @@ class ScanUseCase:
 
             response = autos_protocol(target)
             if response is None:
+                tracker.mark_done(orig_target)
                 return
 
             title = extract_title(response.text)
@@ -167,7 +215,13 @@ class ScanUseCase:
                 elif not config.skip_undetect_server:
                     asyncio.run(self.scan_client.notify_undetect(match_response[0], apikey, host_scan_prod, config.mode))
 
+            # Mark target as done after all processing is complete
+            tracker.mark_done(orig_target)
+
         except Exception as e:
+            # Still mark as done to avoid re-scanning broken targets forever
+            tracker.mark_done(orig_target)
             if config.print_errors:
                 with print_lock:
                     print(colors.error(f"{target} : {e}"))
+

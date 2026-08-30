@@ -21,6 +21,7 @@ class ScanConfig:
     local_undetect_dir: Optional[str] = None
     skip_undetect_server: bool = False
     private_fingerprint_path: Optional[str] = None
+    resume: bool = False
     
 @dataclass
 class ScanResult:

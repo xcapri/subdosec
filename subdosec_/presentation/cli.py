@@ -81,6 +81,7 @@ class CliApp:
     {colors.GREEN}-pf{colors.RESET} {colors.WHITE}/path/to.json{colors.RESET}   {colors.DIM}Use private/local fingerprint file{colors.RESET}
     {colors.GREEN}-t{colors.RESET} {colors.WHITE}20{colors.RESET}               {colors.DIM}Set thread count (default: 10){colors.RESET}
     {colors.GREEN}-v{colors.RESET}                  {colors.DIM}Show scan progress counter{colors.RESET}
+    {colors.GREEN}-resume{colors.RESET}             {colors.DIM}Resume interrupted scan session{colors.RESET}
     {colors.GREEN}-unai{colors.RESET} {colors.WHITE}/path/to/undetect.json{colors.RESET}  {colors.DIM}AI analysis of undetected subdomains{colors.RESET}
 
   {colors.WHITE}{colors.BOLD}Output Options:{colors.RESET}
@@ -122,10 +123,11 @@ class CliApp:
         parser.add_argument('-web', nargs='?', const=8443, type=int, metavar='PORT', help='Launch web dashboard (default port: 8443)')
         parser.add_argument('-v', '--verbose', action='store_true', help='Show progress count (e.g. [1/10])')
         parser.add_argument('-t', '--threads', type=int, default=10, help='Number of threads to use for scanning (default: 10)')
+        parser.add_argument('-resume', action='store_true', help='Resume a previously interrupted scan session')
 
         args = parser.parse_args()
 
-        has_action = any([args.help, args.initkey, args.uf, args.pf, args.sfid, args.ks, args.unai, args.subfng, args.web is not None])
+        has_action = any([args.help, args.initkey, args.uf, args.pf, args.sfid, args.ks, args.unai, args.subfng, args.web is not None, args.resume])
         has_stdin = not sys.stdin.isatty()
 
         if args.help or (not has_action and not has_stdin):
@@ -143,7 +145,8 @@ class CliApp:
             output_dir=args.o,
             local_undetect_dir=args.lu,
             skip_undetect_server=args.su,
-            private_fingerprint_path=args.pf
+            private_fingerprint_path=args.pf,
+            resume=args.resume
         )
         # Lock target service filter
         config.lock_fingerprints = args.lf
@@ -180,6 +183,9 @@ class CliApp:
             user_dir = self.storage.get_user_dir()
             dashboard = WebDashboard(user_dir)
             dashboard.start(port=args.web)
+        elif args.resume:
+            # Resume mode: targets are loaded from the saved session
+            self.scan_use_case.execute(config, [])
         else:
             targets = [line.strip() for line in sys.stdin if line.strip()]
             self.scan_use_case.execute(config, targets)
