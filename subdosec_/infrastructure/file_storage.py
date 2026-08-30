@@ -127,6 +127,7 @@ class FileStorage(LocalStorage):
             os.makedirs(output_dir)
 
         file_path = os.path.join(output_dir, "undetect.json")
+        tmp_path = file_path + ".tmp"
 
         with file_lock:
             if os.path.exists(file_path):
@@ -142,5 +143,9 @@ class FileStorage(LocalStorage):
 
             data.append(data_to_append)
 
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(tmp_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=4)
+                f.flush()
+                os.fsync(f.fileno())
+
+            os.replace(tmp_path, file_path)
